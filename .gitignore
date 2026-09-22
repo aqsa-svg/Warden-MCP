@@ -1,0 +1,13 @@
+# secrets -- never commit
+.env
+
+# runtime state
+var/
+*.db
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/

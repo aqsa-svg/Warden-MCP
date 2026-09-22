@@ -1,0 +1,864 @@
+[
+ {
+  "title": "Scheduled report delivery is failing",
+  "body": "Delivery failures are almost always an expired data source credential or a bounced recipient address. Check the Delivery Log for the specific error before re-running the schedule.",
+  "tags": [
+   "reports",
+   "troubleshooting",
+   "email"
+  ]
+ },
+ {
+  "title": "Changing a report schedule",
+  "body": "Edit the schedule under Reports > Delivery. Changes apply from the next run; the current run is not cancelled.",
+  "tags": [
+   "reports",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Report delivery windows and skipped runs",
+  "body": "A scheduled report that overruns its window is skipped rather than queued. Consecutive skips raise a warning in the Delivery Log.",
+  "tags": [
+   "reports",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Timezone handling in scheduled reports",
+  "body": "Schedules run in the workspace timezone, not the recipient's. Daylight saving transitions shift delivery by an hour unless UTC is selected.",
+  "tags": [
+   "reports",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Adding recipients to a scheduled report",
+  "body": "Recipients are managed per schedule. External addresses require the workspace to permit outbound delivery to unverified domains.",
+  "tags": [
+   "reports",
+   "email"
+  ]
+ },
+ {
+  "title": "Report delivery to distribution lists",
+  "body": "Distribution lists are supported but bounce handling is limited: a single hard bounce disables the whole list until an owner re-enables it.",
+  "tags": [
+   "reports",
+   "email"
+  ]
+ },
+ {
+  "title": "Pausing all scheduled reports",
+  "body": "An owner can pause delivery workspace-wide under Settings > Delivery. Paused schedules do not accumulate a backlog.",
+  "tags": [
+   "reports",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Scheduled report shows stale data",
+  "body": "The report renders against the last completed refresh. If the refresh is running when delivery fires, the previous snapshot is sent.",
+  "tags": [
+   "reports",
+   "data-sources"
+  ]
+ },
+ {
+  "title": "Report subscription limits by plan",
+  "body": "Business permits 25 active schedules per workspace, Enterprise 250. Disabled schedules do not count.",
+  "tags": [
+   "reports",
+   "billing",
+   "limits"
+  ]
+ },
+ {
+  "title": "Resending a failed report delivery",
+  "body": "Use Resend in the Delivery Log. Resending re-renders the report, so the content may differ from the original attempt.",
+  "tags": [
+   "reports",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Email delivery troubleshooting",
+  "body": "Check the Delivery Log first. Most failures are recipient-side: full mailboxes, aggressive spam filtering, or a domain that rejects our sending IPs.",
+  "tags": [
+   "email",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Verifying a sending domain",
+  "body": "Add the provided DKIM and SPF records to your DNS. Verification usually completes within an hour but can take up to 48.",
+  "tags": [
+   "email",
+   "setup"
+  ]
+ },
+ {
+  "title": "Why an email landed in spam",
+  "body": "Unverified sending domains are the most common cause. Verify the domain and ask recipients to mark the first message as not spam.",
+  "tags": [
+   "email",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Alert notification channels",
+  "body": "Alerts can deliver by email, webhook, or in-app. Each channel is configured independently and a failure in one does not suppress the others.",
+  "tags": [
+   "alerts",
+   "integrations"
+  ]
+ },
+ {
+  "title": "Muting alert notifications",
+  "body": "Alerts can be muted per user or per workspace. Muting suppresses delivery but still records the trigger in the alert history.",
+  "tags": [
+   "alerts"
+  ]
+ },
+ {
+  "title": "Alert threshold configuration",
+  "body": "Thresholds are evaluated on each refresh. An alert that would fire on every refresh is rate limited to one notification per hour.",
+  "tags": [
+   "alerts"
+  ]
+ },
+ {
+  "title": "Notification digest settings",
+  "body": "Digests batch notifications into a single message. Digest frequency is per user, not per workspace.",
+  "tags": [
+   "alerts",
+   "email"
+  ]
+ },
+ {
+  "title": "Changing the reply-to address",
+  "body": "The reply-to address is set per workspace under Settings > Delivery. It does not affect the envelope sender used for authentication.",
+  "tags": [
+   "email",
+   "setup"
+  ]
+ },
+ {
+  "title": "Changing your billing plan",
+  "body": "Plan changes take effect immediately and are prorated. Downgrades that exceed the new plan's seat limit are blocked until seats are removed.",
+  "tags": [
+   "billing",
+   "account"
+  ]
+ },
+ {
+  "title": "Understanding your invoice",
+  "body": "Invoices list seat charges, usage overages, and any prorated adjustments from a mid-cycle plan change.",
+  "tags": [
+   "billing"
+  ]
+ },
+ {
+  "title": "Updating a payment method",
+  "body": "Only billing administrators can update the payment method. The change applies to the next invoice, not to an outstanding one.",
+  "tags": [
+   "billing",
+   "account"
+  ]
+ },
+ {
+  "title": "Failed payment and account suspension",
+  "body": "After three failed attempts over ten days the workspace becomes read-only. Data is retained and access is restored on payment.",
+  "tags": [
+   "billing"
+  ]
+ },
+ {
+  "title": "Requesting a refund",
+  "body": "Refunds are available within 14 days of an invoice for unused prorated time. Usage overages are not refundable.",
+  "tags": [
+   "billing"
+  ]
+ },
+ {
+  "title": "Seat counting and inactive users",
+  "body": "A seat is consumed on invitation acceptance. Deactivating a user frees the seat at the next billing cycle, not immediately.",
+  "tags": [
+   "billing",
+   "account",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Annual versus monthly billing",
+  "body": "Annual billing is invoiced up front at a discount. Switching from annual to monthly takes effect at renewal.",
+  "tags": [
+   "billing"
+  ]
+ },
+ {
+  "title": "Tax and VAT details on invoices",
+  "body": "Add your tax identifier under Settings > Billing. Invoices already issued are not reissued with a new identifier.",
+  "tags": [
+   "billing"
+  ]
+ },
+ {
+  "title": "Usage overage charges",
+  "body": "Overages are billed at the end of the cycle. A usage alert can be configured to warn before the included allowance is exhausted.",
+  "tags": [
+   "billing",
+   "limits"
+  ]
+ },
+ {
+  "title": "Resetting your password",
+  "body": "Use the Forgot Password link on the sign-in page. The reset link expires after 30 minutes; request a new one rather than reusing an old link.",
+  "tags": [
+   "auth",
+   "account"
+  ]
+ },
+ {
+  "title": "Configuring SAML single sign-on",
+  "body": "SSO is configured under Settings > Authentication. Meridian supports SP-initiated SAML 2.0. Just-in-time provisioning is optional and off by default.",
+  "tags": [
+   "auth",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "SAML login loops back to the sign-in page",
+  "body": "A redirect loop almost always means the ACS URL or entity id does not match the identity provider configuration. Compare both exactly.",
+  "tags": [
+   "auth",
+   "troubleshooting",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "Enabling two-factor authentication",
+  "body": "2FA is enforced per workspace under Settings > Authentication. Enforcing it signs out all sessions that have not enrolled.",
+  "tags": [
+   "auth",
+   "security"
+  ]
+ },
+ {
+  "title": "Lost two-factor device",
+  "body": "An owner can reset a user's 2FA enrolment. Recovery codes issued at enrolment also work and are single use.",
+  "tags": [
+   "auth",
+   "account"
+  ]
+ },
+ {
+  "title": "Session length and idle timeout",
+  "body": "Sessions last 30 days by default, with an optional idle timeout. Changing either does not terminate existing sessions.",
+  "tags": [
+   "auth",
+   "security"
+  ]
+ },
+ {
+  "title": "SCIM user provisioning",
+  "body": "SCIM keeps users and groups in sync from your identity provider. Deprovisioning through SCIM deactivates rather than deletes.",
+  "tags": [
+   "auth",
+   "enterprise",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Login blocked by IP allowlist",
+  "body": "If an allowlist is configured, sign-in from outside it fails with a generic error rather than naming the allowlist.",
+  "tags": [
+   "auth",
+   "security"
+  ]
+ },
+ {
+  "title": "Service account authentication",
+  "body": "Service accounts authenticate with a long-lived key and cannot use SSO. Rotate keys under Settings > API.",
+  "tags": [
+   "auth",
+   "api"
+  ]
+ },
+ {
+  "title": "Connecting a Postgres data source",
+  "body": "Add the connection under Settings > Data Sources. Meridian requires a read-only role and allowlisting of our egress IPs. SSL is required.",
+  "tags": [
+   "data-sources",
+   "setup"
+  ]
+ },
+ {
+  "title": "Connecting a Snowflake warehouse",
+  "body": "Use a dedicated warehouse and role. Meridian will not create objects; the role needs only USAGE and SELECT.",
+  "tags": [
+   "data-sources",
+   "setup"
+  ]
+ },
+ {
+  "title": "Connecting BigQuery",
+  "body": "Authenticate with a service account restricted to the datasets you intend to expose. Cross-project queries need explicit grants.",
+  "tags": [
+   "data-sources",
+   "setup"
+  ]
+ },
+ {
+  "title": "Data refresh schedules",
+  "body": "Refreshes run hourly on Business and every 15 minutes on Enterprise. A refresh that overruns its window is skipped rather than queued.",
+  "tags": [
+   "data-sources",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Data source credential rotation",
+  "body": "Rotating a credential does not interrupt in-flight refreshes. Update the connection before the old credential is revoked.",
+  "tags": [
+   "data-sources",
+   "security"
+  ]
+ },
+ {
+  "title": "Expired data source credentials",
+  "body": "An expired credential fails every dependent refresh and every scheduled report that renders against it. The Delivery Log shows the underlying error.",
+  "tags": [
+   "data-sources",
+   "troubleshooting",
+   "reports"
+  ]
+ },
+ {
+  "title": "Read replicas and stale reads",
+  "body": "Pointing a connection at a read replica can produce reports that lag the primary. Replica lag is not surfaced in the UI.",
+  "tags": [
+   "data-sources",
+   "performance"
+  ]
+ },
+ {
+  "title": "Connection pool exhaustion",
+  "body": "Concurrent refreshes share a pool per connection. Exhaustion appears as refresh timeouts rather than connection errors.",
+  "tags": [
+   "data-sources",
+   "performance"
+  ]
+ },
+ {
+  "title": "Allowlisting egress IP addresses",
+  "body": "Our egress addresses are listed under Settings > Data Sources and change with at least 30 days notice.",
+  "tags": [
+   "data-sources",
+   "security",
+   "setup"
+  ]
+ },
+ {
+  "title": "CSV import size limits",
+  "body": "Uploads are capped at 250 MB per file and 2 million rows. Larger datasets should be loaded through a data source connection.",
+  "tags": [
+   "data-sources",
+   "limits"
+  ]
+ },
+ {
+  "title": "Scheduling a CSV refresh from cloud storage",
+  "body": "A storage-backed dataset can refresh on a schedule. The file must keep a stable name and schema between refreshes.",
+  "tags": [
+   "data-sources",
+   "scheduling"
+  ]
+ },
+ {
+  "title": "Schema changes in an upstream table",
+  "body": "A removed or retyped column breaks dependent charts. Meridian does not migrate definitions automatically.",
+  "tags": [
+   "data-sources",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Troubleshooting slow dashboards",
+  "body": "The usual cause is an unindexed join in a custom SQL block. Open the Query Profiler and look for scans over 2 million rows.",
+  "tags": [
+   "dashboards",
+   "performance",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Query Profiler basics",
+  "body": "The profiler shows per-block execution time and rows scanned. Times exclude queueing, so a fast profile can still render slowly under load.",
+  "tags": [
+   "dashboards",
+   "performance"
+  ]
+ },
+ {
+  "title": "Custom SQL query limits",
+  "body": "Custom SQL blocks are capped at 60 seconds and 500 MB scanned on Business. Enterprise raises this to 300 seconds.",
+  "tags": [
+   "api",
+   "limits",
+   "dashboards"
+  ]
+ },
+ {
+  "title": "Caching and dashboard freshness",
+  "body": "Results are cached per query for the refresh interval. A manual refresh bypasses the cache for that viewer only.",
+  "tags": [
+   "dashboards",
+   "performance"
+  ]
+ },
+ {
+  "title": "Dashboard filters and query pushdown",
+  "body": "Filters are pushed into the query where the data source supports it. Where it does not, filtering happens after retrieval and is slower.",
+  "tags": [
+   "dashboards"
+  ]
+ },
+ {
+  "title": "Cross-filtering between charts",
+  "body": "Cross-filtering applies to charts sharing a data source. Charts on other sources are unaffected and can appear inconsistent.",
+  "tags": [
+   "dashboards"
+  ]
+ },
+ {
+  "title": "Duplicating a dashboard",
+  "body": "Duplication copies chart definitions but not schedules or alerts. Those must be recreated on the copy.",
+  "tags": [
+   "dashboards"
+  ]
+ },
+ {
+  "title": "Dashboard load fails with a partial render",
+  "body": "A partial render means one block errored while others succeeded. Each block reports its own error in place.",
+  "tags": [
+   "dashboards",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Chart type limitations",
+  "body": "Some chart types require a time dimension and will refuse to render without one, rather than rendering empty.",
+  "tags": [
+   "dashboards"
+  ]
+ },
+ {
+  "title": "Mobile dashboard rendering",
+  "body": "Dashboards reflow on narrow screens. Fixed-width custom blocks may clip and are not reflowed.",
+  "tags": [
+   "dashboards",
+   "mobile"
+  ]
+ },
+ {
+  "title": "Exporting dashboards to PDF",
+  "body": "Use Share > Export > PDF. Exports over 40 pages are truncated. Scheduled PDF exports are available on Business and Enterprise.",
+  "tags": [
+   "dashboards",
+   "export",
+   "reports"
+  ]
+ },
+ {
+  "title": "Exporting chart data to CSV",
+  "body": "CSV export returns the query result, not the rendered chart. Row limits match the chart's own limit.",
+  "tags": [
+   "export"
+  ]
+ },
+ {
+  "title": "Scheduled export delivery failures",
+  "body": "A scheduled export shares the delivery pipeline with reports, so failures appear in the same Delivery Log.",
+  "tags": [
+   "export",
+   "reports",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Export row limits",
+  "body": "Exports are capped at 1 million rows. Beyond that, query the data source directly.",
+  "tags": [
+   "export",
+   "limits"
+  ]
+ },
+ {
+  "title": "Sharing a dashboard with a link",
+  "body": "Link sharing respects row-level permissions. A recipient without access sees an empty dashboard rather than an error.",
+  "tags": [
+   "export",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Embedding dashboards in your application",
+  "body": "Signed embedding uses a short-lived JWT. Tokens are valid for 10 minutes and must be minted server-side; embedding keys must never ship to a browser.",
+  "tags": [
+   "integrations",
+   "security",
+   "export"
+  ]
+ },
+ {
+  "title": "Public dashboard links",
+  "body": "Public links bypass authentication entirely and ignore row-level rules. They are disabled by default and require an owner to enable.",
+  "tags": [
+   "export",
+   "security",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Watermarking exported files",
+  "body": "Enterprise workspaces can watermark PDF exports with the viewer's identity. Watermarks are not applied to CSV.",
+  "tags": [
+   "export",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "API rate limits",
+  "body": "The REST API allows 600 requests per minute per workspace. Exceeding it returns HTTP 429 with a Retry-After header. Batch endpoints count as one request.",
+  "tags": [
+   "api",
+   "limits"
+  ]
+ },
+ {
+  "title": "Handling HTTP 429 responses",
+  "body": "Respect the Retry-After header and apply jitter. Retrying immediately will keep you rate limited for longer.",
+  "tags": [
+   "api",
+   "troubleshooting"
+  ]
+ },
+ {
+  "title": "Creating and rotating API keys",
+  "body": "Keys are created per service account under Settings > API. Rotation is immediate; the old key stops working on save.",
+  "tags": [
+   "api",
+   "security"
+  ]
+ },
+ {
+  "title": "Configuring outbound webhooks",
+  "body": "Webhooks POST a JSON payload to your endpoint on alert trigger. Endpoints must return 2xx within 5 seconds or the delivery is retried three times.",
+  "tags": [
+   "integrations",
+   "api",
+   "alerts"
+  ]
+ },
+ {
+  "title": "Verifying webhook signatures",
+  "body": "Each delivery carries an HMAC signature. Verify it before acting on the payload; the signing secret is shown once at creation.",
+  "tags": [
+   "integrations",
+   "security"
+  ]
+ },
+ {
+  "title": "Webhook retries and duplicate deliveries",
+  "body": "Retries mean your endpoint must be idempotent. A duplicate delivery carries the same event id.",
+  "tags": [
+   "integrations",
+   "api"
+  ]
+ },
+ {
+  "title": "Pagination in list endpoints",
+  "body": "List endpoints return a cursor. Cursors expire after 15 minutes and cannot be reused across parameter changes.",
+  "tags": [
+   "api"
+  ]
+ },
+ {
+  "title": "API versioning policy",
+  "body": "Breaking changes ship under a new version header. Old versions are supported for 12 months after a successor is announced.",
+  "tags": [
+   "api"
+  ]
+ },
+ {
+  "title": "Slack integration setup",
+  "body": "Connect Slack under Settings > Integrations. Alert delivery to a private channel requires inviting the Meridian app to that channel.",
+  "tags": [
+   "integrations",
+   "alerts"
+  ]
+ },
+ {
+  "title": "Programmatic report generation",
+  "body": "Reports can be rendered on demand through the API. The response is asynchronous; poll the returned job id.",
+  "tags": [
+   "api",
+   "reports"
+  ]
+ },
+ {
+  "title": "Understanding row-level permissions",
+  "body": "Row-level rules filter query results per user attribute. Rules are applied at query time and cannot be bypassed by dashboard filters.",
+  "tags": [
+   "permissions",
+   "security"
+  ]
+ },
+ {
+  "title": "Inviting team members",
+  "body": "Owners and Admins can invite by email. Invitations expire after 7 days. Seat count is enforced at acceptance time.",
+  "tags": [
+   "account",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Role capabilities reference",
+  "body": "Viewers can read, Editors can modify definitions, Admins manage users, Owners manage billing and deletion.",
+  "tags": [
+   "permissions",
+   "account"
+  ]
+ },
+ {
+  "title": "Transferring workspace ownership",
+  "body": "An owner can promote another admin and step down. A workspace must always have at least one owner.",
+  "tags": [
+   "account",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Group-based access control",
+  "body": "Groups can be synced from your identity provider or managed locally. Local edits to a synced group are overwritten on the next sync.",
+  "tags": [
+   "permissions",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "Audit log contents and retention",
+  "body": "The audit log records sign-ins, permission changes, and data source edits. Retention is 90 days on Business and 400 on Enterprise.",
+  "tags": [
+   "security",
+   "compliance",
+   "data-retention"
+  ]
+ },
+ {
+  "title": "Exporting the audit log",
+  "body": "Audit entries can be exported as CSV or streamed to a SIEM. Streaming is Enterprise only.",
+  "tags": [
+   "security",
+   "compliance",
+   "export"
+  ]
+ },
+ {
+  "title": "Data retention policy",
+  "body": "Raw event data is retained for 13 months on Business and 25 months on Enterprise. Aggregates are retained indefinitely.",
+  "tags": [
+   "data-retention",
+   "compliance"
+  ]
+ },
+ {
+  "title": "Deleting a workspace",
+  "body": "Workspace deletion is soft for 30 days and recoverable by an owner. After 30 days the data is purged and cannot be restored.",
+  "tags": [
+   "account",
+   "data-retention"
+  ]
+ },
+ {
+  "title": "Right to erasure requests",
+  "body": "A customer record can be erased on request. Erasure is a soft delete for 30 days, then permanent, and is recorded in the audit log.",
+  "tags": [
+   "compliance",
+   "data-retention",
+   "account"
+  ]
+ },
+ {
+  "title": "Data residency options",
+  "body": "Enterprise workspaces can pin storage to the EU or US. Residency cannot be changed after provisioning.",
+  "tags": [
+   "compliance",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "Subprocessor list",
+  "body": "Our current subprocessors are listed in the trust centre. Changes are announced 30 days in advance.",
+  "tags": [
+   "compliance"
+  ]
+ },
+ {
+  "title": "Support hours and SLA",
+  "body": "Business plans receive a first response within one business day. Enterprise plans receive a one-hour response for Severity 1 incidents.",
+  "tags": [
+   "support",
+   "billing"
+  ]
+ },
+ {
+  "title": "How to escalate a support ticket",
+  "body": "Reply to the ticket asking for escalation, or contact your account manager. Escalation does not change the SLA clock.",
+  "tags": [
+   "support"
+  ]
+ },
+ {
+  "title": "Reporting a suspected security issue",
+  "body": "Email the security address in the trust centre. Do not include credentials in the report.",
+  "tags": [
+   "support",
+   "security"
+  ]
+ },
+ {
+  "title": "Status page and incident history",
+  "body": "Subscribe to the status page for incident notifications. Historical incidents remain visible for 12 months.",
+  "tags": [
+   "support"
+  ]
+ },
+ {
+  "title": "Renaming a workspace",
+  "body": "Renaming does not change the workspace URL slug. The slug can be changed separately and old links stop working.",
+  "tags": [
+   "account"
+  ]
+ },
+ {
+  "title": "Changing your account email",
+  "body": "A verification link is sent to the new address. The change applies once the link is used.",
+  "tags": [
+   "account",
+   "auth"
+  ]
+ },
+ {
+  "title": "Downloading your data",
+  "body": "An owner can request a full export. The archive is prepared asynchronously and the link expires after 7 days.",
+  "tags": [
+   "account",
+   "export",
+   "compliance"
+  ]
+ },
+ {
+  "title": "Browser support policy",
+  "body": "The two most recent versions of Chrome, Firefox, Safari, and Edge are supported. Older browsers may render but are untested.",
+  "tags": [
+   "support"
+  ]
+ },
+ {
+  "title": "Keyboard shortcuts",
+  "body": "Press ? on any dashboard for the shortcut list. Shortcuts are not configurable.",
+  "tags": [
+   "dashboards",
+   "support"
+  ]
+ },
+ {
+  "title": "Localisation and number formats",
+  "body": "Number and date formats follow the workspace locale, not the viewer's. Currency symbols are set per chart.",
+  "tags": [
+   "dashboards",
+   "account"
+  ]
+ },
+ {
+  "title": "Deactivating versus deleting a user",
+  "body": "Deactivation preserves the user's content and frees the seat at the next cycle. Deletion reassigns their content to an owner.",
+  "tags": [
+   "account",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Trial limitations",
+  "body": "Trials include Business features with a 5 seat cap and 14 day data retention. Converting preserves all content.",
+  "tags": [
+   "billing",
+   "limits"
+  ]
+ },
+ {
+  "title": "Contacting your account manager",
+  "body": "Enterprise workspaces have a named account manager listed under Settings > Support.",
+  "tags": [
+   "support",
+   "enterprise"
+  ]
+ },
+ {
+  "title": "Requesting a feature",
+  "body": "Feature requests go through the in-app feedback form and are reviewed quarterly.",
+  "tags": [
+   "support"
+  ]
+ },
+ {
+  "title": "Sandbox workspaces",
+  "body": "Enterprise plans include a sandbox workspace for testing. Sandboxes share the seat pool but not the data.",
+  "tags": [
+   "enterprise",
+   "account"
+  ]
+ },
+ {
+  "title": "Migrating content between workspaces",
+  "body": "Dashboards can be exported as definitions and imported elsewhere. Schedules, alerts, and permissions do not transfer.",
+  "tags": [
+   "account",
+   "export"
+  ]
+ },
+ {
+  "title": "Bulk user management",
+  "body": "Users can be invited or deactivated in bulk from a CSV. The CSV must include the email column and may include a role column.",
+  "tags": [
+   "account",
+   "permissions"
+  ]
+ },
+ {
+  "title": "Understanding the activity feed",
+  "body": "The feed shows recent edits per dashboard. It is not an audit log and omits permission changes.",
+  "tags": [
+   "dashboards",
+   "security"
+  ]
+ },
+ {
+  "title": "Archiving old dashboards",
+  "body": "Archived dashboards are hidden from search but keep their links working. Archiving does not stop their schedules.",
+  "tags": [
+   "dashboards",
+   "reports"
+  ]
+ },
+ {
+  "title": "Restoring a deleted dashboard",
+  "body": "Deleted dashboards are recoverable for 30 days from the trash by an editor or above.",
+  "tags": [
+   "dashboards",
+   "data-retention"
+  ]
+ }
+]

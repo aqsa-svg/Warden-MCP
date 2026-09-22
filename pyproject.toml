@@ -1,0 +1,52 @@
+[project]
+name = "warden"
+version = "0.1.0"
+description = "A governed MCP gateway: provenance labelling and policy enforcement between an agent and its MCP tools."
+requires-python = "==3.12.*"
+dependencies = [
+    "google-genai>=2.22.0",
+    "langgraph>=1.2.11",
+    "mcp>=2.1.1",
+    "pydantic>=2.9",
+    "python-dotenv>=1.2.3",
+    "python-ulid>=4.0.1",
+    "pyyaml>=6.0",
+    "typer>=0.27.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "hypothesis>=6.112",
+    "mypy>=1.11",
+    "types-pyyaml>=6.0",
+]
+
+[project.scripts]
+warden = "warden.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["warden"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_any_explicit = false
+
+[[tool.mypy.overrides]]
+module = "warden.policy.*"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "anyio>=4.15.0",
+    "pytest-anyio>=0.0.0",
+]

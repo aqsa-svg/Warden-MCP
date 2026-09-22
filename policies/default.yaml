@@ -1,0 +1,79 @@
+schema_version: 1
+
+# What the gateway wrapper does when a *check errors* -- registry lookup, taint
+# resolution, schema fetch. Every risk level must appear; there is no default.
+# An unknown risk level (registry lookup itself failed) is treated as CRITICAL.
+fail_modes:
+  LOW: OPEN
+  MEDIUM: CLOSED
+  HIGH: CLOSED
+  CRITICAL: CLOSED
+
+# Tools present in the registry but absent here resolve to unclassified-tool and deny.
+classification:
+  search_docs:    { risk_level: LOW,      side_effect: READ_ONLY }
+  read_file:      { risk_level: LOW,      side_effect: READ_ONLY }
+  write_file:     { risk_level: MEDIUM,   side_effect: LOCAL_WRITE }
+  send_email:     { risk_level: HIGH,     side_effect: EXTERNAL_COMMS }
+  http_post:      { risk_level: HIGH,     side_effect: EXTERNAL_COMMS }
+  run_shell:      { risk_level: CRITICAL, side_effect: CODE_EXEC }
+  read_secret:    { risk_level: CRITICAL, side_effect: CREDENTIAL_ACCESS }
+
+# First match wins, in file order. A synthetic default-deny sits below the last rule.
+rules:
+  - id: exfil-via-external-comms
+    description: >
+      Untrusted content must not reach a tool that can talk to the outside world.
+      This is the primary exfiltration path the red-team suite exercises.
+    match:
+      side_effect: [EXTERNAL_COMMS]
+      argument_taint:
+        any_of:
+          - kind: RETRIEVED
+          - kind: TOOL_OUTPUT
+    outcome: DENY
+
+  - id: tainted-code-exec
+    description: Any non-user provenance reaching code execution.
+    match:
+      side_effect: [CODE_EXEC]
+      argument_taint:
+        any_of:
+          - kind: RETRIEVED
+          - kind: TOOL_OUTPUT
+    outcome: DENY
+
+  - id: critical-always-approves
+    description: >
+      USER_INPUT is semi-trusted, not trusted -- direct prompt injection arrives
+      through it. Absence of RETRIEVED/TOOL_OUTPUT taint is not sufficient warrant
+      for a CRITICAL tool, so these escalate rather than allow.
+    match:
+      risk_level: [CRITICAL]
+    outcome: REQUIRE_APPROVAL
+
+  - id: search-output-into-local-write
+    description: Narrower than the rule below it; must sit above it to be reachable.
+    match:
+      side_effect: [LOCAL_WRITE]
+      argument_taint:
+        any_of:
+          - kind: TOOL_OUTPUT
+            tool: search_docs
+    outcome: REQUIRE_APPROVAL
+
+  - id: untainted-local-write
+    description: Local writes derived only from operator input.
+    match:
+      side_effect: [LOCAL_WRITE]
+      argument_taint:
+        none_of:
+          - kind: RETRIEVED
+          - kind: TOOL_OUTPUT
+    outcome: ALLOW
+
+  - id: read-only-allow
+    description: Read-only tools carry no side effect worth gating.
+    match:
+      side_effect: [READ_ONLY]
+    outcome: ALLOW
