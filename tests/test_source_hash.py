@@ -21,6 +21,27 @@ def test_source_hash_is_stable_and_prefixed() -> None:
     assert first.startswith("sha256:")
 
 
+def test_hash_covers_runtime_and_definitions_not_tooling() -> None:
+    """The hash must track behaviour-defining code and ignore post-hoc machinery, so a
+    report or grading change never spuriously invalidates calibration."""
+    from warden.source_hash import _relevant_files
+
+    covered = {p.as_posix() for p in _relevant_files()}
+    # runtime + definitions are covered
+    assert any("warden/policy/engine.py" in c for c in covered)
+    assert any("warden/gateway/wrapper.py" in c for c in covered)
+    assert any("warden/taint/resolver.py" in c for c in covered)
+    assert any("warden/redteam/payloads.py" in c for c in covered)
+    assert any("warden/redteam/benign.py" in c for c in covered)
+    assert any("policies/demo.yaml" in c for c in covered)
+    # post-hoc machinery is NOT covered
+    assert not any("warden/report/" in c for c in covered)
+    assert not any("warden/redteam/oracles.py" in c for c in covered)
+    assert not any("warden/redteam/journal.py" in c for c in covered)
+    assert not any("warden/cli.py" in c for c in covered)
+    assert not any("warden/source_hash.py" in c for c in covered)
+
+
 def test_recorded_attempts_carry_the_current_hash(tmp_path: Path) -> None:
     journal = Journal(tmp_path / "j.jsonl")
     attempt = record_attempt(

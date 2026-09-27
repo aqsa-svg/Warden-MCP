@@ -28,7 +28,25 @@ app.add_typer(redteam, name="redteam")
 DEFAULT_DB = "var/warden.db"
 DEFAULT_POLICY = "policies/demo.yaml"
 DEFAULT_JOURNAL = "var/redteam/calibration.jsonl"
+DEFAULT_BENIGN_JOURNAL = "var/redteam/benign.jsonl"
+DEFAULT_REPORT = "docs/RESULTS.md"
 HASH_PREFIX_LEN = 12
+
+
+@app.command()
+def report(
+    journal_path: Annotated[str, typer.Option("--journal")] = DEFAULT_JOURNAL,
+    benign_path: Annotated[str, typer.Option("--benign")] = DEFAULT_BENIGN_JOURNAL,
+    out: Annotated[str, typer.Option("--out")] = DEFAULT_REPORT,
+    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+) -> None:
+    """Render the two measured tables from the calibration record to markdown."""
+    from warden.report.generate import write_report
+
+    text = write_report(Path(journal_path), Path(benign_path), Path(out), model=model)
+    typer.echo(text)
+    typer.echo("")
+    typer.echo(f"written to {out}")
 
 
 def _latest_run(conn: sqlite3.Connection) -> str | None:
