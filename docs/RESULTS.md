@@ -24,7 +24,9 @@ Two rates, never averaged: a hard block (DENY) is a correctness defect; an escal
 
 | stratum (steps) | hard-block rate | escalation rate | clean |
 |---|---|---|---|
-| _no benign runs recorded yet_ | — | — | — |
+| 2-3 | 1/5 | 1/5 | 3/5 |
+| 4-5 | 0/1 | 0/1 | 1/1 |
+| 6+ | 0/0 | 0/0 | 0/0 |
 
 **Stratification confound** (`docs/findings/stratification-confound.md`): the escalation rate is confounded with length and pinned to the short stratum, because turn-level taint makes a long *untainted* boundary call impossible. The hard-block cases are spread across strata by design so that rate is not confounded. Read as a pure length effect the table would be wrong.
 

@@ -28,7 +28,7 @@ from warden.config import DEFAULT_MODEL
 from warden.demo_agent.agent import AgentState, ModelCall, build_graph, mcp_tool_specs
 from warden.gateway.config import credential_env_vars
 from warden.log.models import RunVariant
-from warden.redteam.benign import BenignScenario
+from warden.redteam.benign import SCENARIOS, BenignScenario
 from warden.redteam.benign_journal import BenignJournal, BenignRecord
 from warden.redteam.benign_oracle import classify_run
 from warden.source_hash import source_hash
@@ -51,18 +51,24 @@ async def run_scenario(
     model_call: ModelCall,
     policy_path: str = "policies/demo.yaml",
     variant: RunVariant = RunVariant.GOVERNED,
+    mode: str = "BENCH",
 ) -> str:
     """Run one benign scenario's task through the governed gateway. Returns the run_id.
 
     No `--poisoned`: a benign run must be structurally incapable of loading a payload,
     which the demo server guarantees by only injecting one when the flag is present.
+
+    mode=BENCH so an escalation auto-denies without reaching for /dev/tty -- a benchmark
+    does not wait for a human, and a REQUIRE_APPROVAL that auto-denies is exactly the
+    ESCALATE outcome the FPR split measures.
     """
     params = StdioServerParameters(
         env=_forwarded_env(),
         command=sys.executable,
         args=[
             "-m", "warden.gateway", "--db", db_path, "--policy", policy_path,
-            "--variant", variant.value, "--agent-id", "demo-agent", "--",
+            "--variant", variant.value, "--mode", mode,
+            "--agent-id", "demo-agent", "--",
             sys.executable, "-m", "warden.demo_server", state_dir,
         ],
     )
@@ -117,3 +123,68 @@ def read_run_timestamp(db_path: str, run_id: str) -> int:
             "SELECT started_at_us FROM runs WHERE run_id = ?", (run_id,)
         ).fetchone()
     return int(row[0]) if row else 0
+
+
+async def run_suite(
+    *,
+    journal: BenignJournal,
+    var_dir: Path,
+    make_model: Any,
+    model: str = DEFAULT_MODEL,
+    now_us: Any,
+) -> list[BenignRecord]:
+    """Run every outstanding benign scenario for `model`, resumably, until done or the
+    daily quota is hit.
+
+    Resumes from the journal: a scenario already recorded is skipped, never re-charged.
+    On BudgetExceeded (the per-day quota fast-fail from the model adapter) it stops
+    cleanly, leaving the interrupted scenario unrecorded so it is retried next day --
+    an incomplete run must not be graded.
+
+    `make_model` is a zero-arg factory returning a fresh ModelCall per scenario, so the
+    real Gemini client is created lazily and tests can inject a stub.
+    """
+    done_before = journal.done_scenarios(model)
+    todo = [s for s in SCENARIOS if s.scenario_id not in done_before]
+    recorded: list[BenignRecord] = []
+
+    for scenario in todo:
+        run_dir = var_dir / scenario.scenario_id
+        db_path = str(run_dir / "run.db")
+        state_dir = str(run_dir / "state")
+        run_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            run_id = await run_scenario(
+                scenario, db_path=db_path, state_dir=state_dir,
+                model_call=make_model(),
+            )
+        except BaseException as exc:  # noqa: BLE001
+            # The daily-quota fast-fail raises BudgetExceeded, but the MCP stdio
+            # teardown runs under an anyio task group, so it can reach here wrapped in
+            # an ExceptionGroup. Stop cleanly on a budget breach from either shape;
+            # re-raise anything else -- an unrelated crash must not look like "quota".
+            if _is_budget_exceeded(exc):
+                break
+            raise
+        record = grade_and_record(
+            db_path, scenario, journal, run_id=run_id,
+            timestamp_us=now_us(), model=model,
+        )
+        recorded.append(record)
+
+    return recorded
+
+
+def _is_budget_exceeded(exc: BaseException) -> bool:
+    """True if exc is, wraps, or was caused by BudgetExceeded.
+
+    Handles the bare exception, an ExceptionGroup containing it (MCP/anyio teardown),
+    and a __cause__/__context__ chain."""
+    from warden.errors import BudgetExceeded
+
+    if isinstance(exc, BudgetExceeded):
+        return True
+    if isinstance(exc, BaseExceptionGroup):
+        return any(_is_budget_exceeded(sub) for sub in exc.exceptions)
+    cause = exc.__cause__ or exc.__context__
+    return cause is not None and _is_budget_exceeded(cause)

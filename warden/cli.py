@@ -24,6 +24,89 @@ from warden.redteam.suite import BY_SCENARIO
 app = typer.Typer(add_completion=False, help="Warden: a governed MCP gateway.")
 redteam = typer.Typer(add_completion=False, help="Red-team suite.")
 app.add_typer(redteam, name="redteam")
+benign = typer.Typer(add_completion=False, help="Benign suite (FPR denominator).")
+app.add_typer(benign, name="benign")
+
+
+@benign.command("status")
+def benign_status(
+    benign_path: Annotated[str, typer.Option("--journal")] = "var/redteam/benign.jsonl",
+    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+) -> None:
+    """Show benign-suite progress without spending anything."""
+    from warden.redteam.benign import SCENARIOS
+    from warden.redteam.benign_journal import BenignJournal
+
+    journal = BenignJournal(Path(benign_path))
+    done = journal.done_scenarios(model)
+    typer.echo(f"model {model}")
+    typer.echo(f"benign suite: {len(done)}/{len(SCENARIOS)} recorded")
+    for scenario in SCENARIOS:
+        mark = "done" if scenario.scenario_id in done else "    "
+        typer.echo(f"  [{mark}] {scenario.scenario_id:<28} {scenario.stratum.value}")
+    remaining = [s for s in SCENARIOS if s.scenario_id not in done]
+    typer.echo(f"\n{len(remaining)} scenario(s) remaining")
+
+
+@benign.command("run")
+def benign_run(
+    benign_path: Annotated[str, typer.Option("--journal")] = "var/redteam/benign.jsonl",
+    var_dir: Annotated[str, typer.Option("--var")] = "var/benign",
+    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+) -> None:
+    """Run outstanding benign scenarios through the governed gateway and record results.
+
+    Resumable and quota-safe: skips scenarios already recorded, stops cleanly when the
+    daily model quota is hit, and leaves the interrupted scenario for next time.
+    """
+    import asyncio
+    import os
+    import time
+
+    from dotenv import load_dotenv
+
+    from warden.demo_agent.agent import SYSTEM
+    from warden.demo_agent.gemini import gemini_model
+    from warden.gateway.config import credential_env_vars
+    from warden.redteam.benign_journal import BenignJournal
+    from warden.redteam.benign_runner import run_suite
+
+    load_dotenv()
+    absent = [n for n in credential_env_vars() if not os.environ.get(n)]
+    if absent:
+        parser_absent = ", ".join(absent)
+        typer.echo(f"error: credentials not set: {parser_absent}")
+        raise typer.Exit(code=2)
+    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+        typer.echo("error: GEMINI_API_KEY not set")
+        raise typer.Exit(code=2)
+
+    from google import genai
+
+    client = genai.Client()
+
+    def make_model() -> object:
+        return gemini_model(client, SYSTEM, model)
+
+    def now_us() -> int:
+        return time.time_ns() // 1_000
+
+    journal = BenignJournal(Path(benign_path))
+    recorded = asyncio.run(
+        run_suite(
+            journal=journal, var_dir=Path(var_dir),
+            make_model=make_model, model=model, now_us=now_us,
+        )
+    )
+    for record in recorded:
+        flag = "  DEVIATION" if record.is_deviation else ""
+        typer.echo(
+            f"  {record.scenario_id:<28} {record.observed.value:<11} "
+            f"(expected {record.expected.value}){flag}"
+        )
+    done = journal.done_scenarios(model)
+    typer.echo(f"\nthis run recorded {len(recorded)} scenario(s); "
+               f"{len(done)} total recorded.")
 
 DEFAULT_DB = "var/warden.db"
 DEFAULT_POLICY = "policies/demo.yaml"
