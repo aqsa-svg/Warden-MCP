@@ -179,6 +179,17 @@ def _retry_after_seconds(message: str) -> float:
     return min(float(match.group(1)) + 1.0, MAX_BACKOFF_S)
 
 
+SERVER_BACKOFF_BASE_S: Final = 2.0
+"""5xx is a transient blip ('high demand'), not a quota window, so it starts far
+shorter than the 60s quota backoff and grows: 2s, 4s, 8s, ... capped."""
+
+
+def _backoff_seconds(attempt: int) -> float:
+    """Exponential backoff for transient 5xx server errors, capped. Unlike a quota
+    429, a 503 carries no RetryInfo, so we choose the delay."""
+    return float(min(SERVER_BACKOFF_BASE_S * (2 ** attempt), MAX_BACKOFF_S))
+
+
 def gemini_model(
     client: genai.Client,
     system: str,
@@ -211,6 +222,14 @@ def gemini_model(
                         model=model, contents=contents, config=config
                     )
                 )
+            except genai_errors.ServerError as exc:
+                # 5xx is transient server overload ("try again later"); back off and
+                # retry, unlike a hard client error. Distinct from a quota 429.
+                last = exc
+                delay = _backoff_seconds(attempt)
+                if on_retry is not None:
+                    on_retry(attempt + 1, delay)
+                time.sleep(delay)
             except genai_errors.ClientError as exc:
                 if exc.code != 429:
                     raise
@@ -227,6 +246,6 @@ def gemini_model(
                 if on_retry is not None:
                     on_retry(attempt + 1, delay)
                 time.sleep(delay)
-        raise RuntimeError(f"rate limited after {MAX_RETRIES} attempts") from last
+        raise RuntimeError(f"gave up after {MAX_RETRIES} attempts") from last
 
     return call

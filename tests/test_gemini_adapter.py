@@ -135,3 +135,20 @@ def test_round_trip_preserves_tool_call_linkage() -> None:
     assert call_part is not None and resp_part is not None
     assert call_part.id == resp_part.id
     assert resp_part.name == "get_customer"
+
+
+def test_backoff_grows_and_is_capped() -> None:
+    """Transient 5xx retries back off exponentially (no RetryInfo to honour), capped."""
+    from warden.demo_agent.gemini import MAX_BACKOFF_S, _backoff_seconds
+
+    delays = [_backoff_seconds(n) for n in range(6)]
+    assert delays[0] < delays[1] < delays[2]
+    assert all(d <= MAX_BACKOFF_S for d in delays)
+
+
+def test_daily_quota_is_distinguished_from_transient() -> None:
+    from warden.demo_agent.gemini import is_daily_quota
+
+    assert is_daily_quota("... PerDayPerProject ... quota ...")
+    assert not is_daily_quota("503 UNAVAILABLE high demand")
+    assert not is_daily_quota("PerMinute rate limit")
