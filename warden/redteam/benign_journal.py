@@ -98,11 +98,23 @@ class BenignJournal:
         with open(self.path, encoding="utf-8") as handle:
             return [BenignRecord.from_json(line) for line in handle if line.strip()]
 
-    def done_scenarios(self, model: str) -> set[str]:
+    def done_scenarios(self, model: str, source_hash: str | None = None) -> set[str]:
         """Scenario ids already run for this model. Drives resume: a scenario with a
-        record is skipped rather than re-run and re-charged."""
-        return {r.scenario_id for r in self.records() if r.model == model}
+        record is skipped rather than re-run and re-charged.
 
-    def outstanding(self, scenario_ids: list[str], model: str) -> list[str]:
-        done = self.done_scenarios(model)
+        When `source_hash` is given, only records under that hash count as done, so a
+        policy or runtime change (which moves the hash) correctly re-opens every stale
+        scenario for re-running rather than leaving a result produced by different code
+        standing. A legacy blank hash never matches a real current hash, so legacy
+        records are re-run under the current code, which is the safe direction."""
+        return {
+            r.scenario_id
+            for r in self.records()
+            if r.model == model and (source_hash is None or r.source_hash == source_hash)
+        }
+
+    def outstanding(
+        self, scenario_ids: list[str], model: str, source_hash: str | None = None
+    ) -> list[str]:
+        done = self.done_scenarios(model, source_hash)
         return [s for s in scenario_ids if s not in done]

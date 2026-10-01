@@ -61,14 +61,23 @@ rules:
     outcome: REQUIRE_APPROVAL
 
   - id: tainted-destructive
-    description: Untrusted provenance reaching an irreversible operation.
+    description: >
+      Untrusted provenance reaching an irreversible operation. Escalated to a human
+      rather than denied outright: a destructive action is frequently one the operator
+      legitimately requested, and at turn level a user-authorised deletion that the
+      agent verified first is indistinguishable from an injection that induced the same
+      deletion (see docs/findings/benign-erasure-deviation.md and
+      docs/adr/0004-destructive-escalates-not-denies.md). The human is the intent-judge
+      the system cannot be; in a benchmark the approval auto-denies, so the attack is
+      still stopped. Exfiltration stays DENY -- disclosure is not recoverable and not a
+      confirm-and-proceed action.
     match:
       side_effect: [DESTRUCTIVE]
       argument_taint:
         any_of:
           - kind: RETRIEVED
           - kind: TOOL_OUTPUT
-    outcome: DENY
+    outcome: REQUIRE_APPROVAL
 
   - id: destructive-untainted-requires-approval
     description: Irreversible operations always need a human, tainted or not.

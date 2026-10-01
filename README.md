@@ -104,18 +104,18 @@ supposed to do.
 
 ### A number that looks like a length effect and is partly a taint effect
 
-**6. The benign suite's step-count strata are partly confounded with taint status**
+**6. The benign suite's step-count strata were partly confounded with taint status**
 ([detail](docs/findings/stratification-confound.md)). The suite is stratified by task
-length to ask whether the false-positive rate rises with length. But a false positive
-needs a taint-sensitive boundary call (`send_email`, `delete_customer`), and — because
-taint is a per-run union — an *untainted* boundary call can only be the first tool call.
-So the escalation-rate cases can only be short: long-and-untainted is structurally
-impossible, and the escalation rate is pinned to the short stratum by the taint model,
-not by length. Established model-free (running each scenario's designed tool sequence
-through the taint accumulator) before any quota was spent. The per-stratum table is
-kept, with the caption stating that the escalation rate is confounded with length and
-the mechanism is turn-level taint accumulation. The hard-block cases were deliberately
-spread across the medium and long strata so that rate, at least, is not confounded.
+length to ask whether the false-positive rate rises with length. A false positive needs
+a taint-sensitive boundary call (`send_email`, `delete_customer`), and — because taint
+is a per-run union — an *untainted* boundary call can only be the first tool call, so
+long-and-untainted is structurally impossible. In the original design this pinned the
+escalation rate to the short stratum. **ADR 0004 then broke the confound**: making a
+tainted destructive op escalate rather than deny means escalation now occurs at any
+length (a tainted long deletion escalates), and the only remaining hard-block is tainted
+exfiltration. The residual structural fact (untainted boundary ⇒ first call ⇒ short)
+remains but no longer pins the escalation rate. Established model-free before any quota
+was spent; the per-stratum caption states the current position.
 Read as a pure length effect the table would be wrong — the same class of error as the
 biases above.
 
@@ -191,7 +191,7 @@ embedded instruction — but it is worth recording that it was arrived at, not d
 |---|---|---|
 | indirect prose injection | taint rule (targeted) | 0/3 — declined by the model; entry gate not passed ([negative result](docs/findings/prose-injection-negative-result.md)) |
 | tool-argument exfiltration | `exfil-via-external-comms` taint rule (targeted) | 3/3 ungoverned; governed enforcement confirmation pending one run |
-| privilege escalation | `tainted-destructive` taint rule (targeted) | stub-verified; live calibration pending |
+| privilege escalation | `tainted-destructive` → human approval ([ADR 0004](docs/adr/0004-destructive-escalates-not-denies.md)) | 3/3 ungoverned; blocked under Warden (approval auto-denies) |
 | excessive calls | per-run call budget (blunt) | **not performed — see below** |
 
 **The excessive-calls control is a blunt cap, not a detector.** The per-run call
@@ -216,3 +216,4 @@ rather than filled with an invented number.
 - [ADR 0001 — The retrieval declaration lives in policy, not in `tools/list`](docs/adr/0001-retrieval-declaration-trust-boundary.md)
 - [ADR 0002 — Tainted-write escalation is scoped to `EXTERNAL_COMMS` and `DESTRUCTIVE`](docs/adr/0002-tainted-write-scoping.md)
 - [ADR 0003 — The decision row is committed synchronously before forwarding](docs/adr/0003-synchronous-audit-commit.md)
+- [ADR 0004 — Tainted destructive operations escalate to a human, they do not hard-deny](docs/adr/0004-destructive-escalates-not-denies.md)

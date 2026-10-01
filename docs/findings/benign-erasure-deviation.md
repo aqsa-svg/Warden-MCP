@@ -54,3 +54,14 @@ copied a customer field into a query after lowercasing one character) measured t
 span-level attribution is not reliably recoverable from the agent, which is why
 turn-level was chosen — so this false positive is a known, measured cost of that
 choice, not an oversight.
+
+## Resolution (ADR 0004)
+
+Fixed, and not by making the taint rule smarter — it cannot be, since the benign
+deletion and the attack are observably identical. `tainted-destructive` now escalates
+to a human (`REQUIRE_APPROVAL`) instead of denying. The user-authorised deletion is
+now confirmed by a human rather than hard-blocked; the attack is still stopped (the
+approval auto-denies in a benchmark, and a human denies a deletion triggered by a
+document). The false positive moved from the hard-block column (a defect) to the
+escalation column (designed toil). Verified model-free before adoption. See
+docs/adr/0004-destructive-escalates-not-denies.md.

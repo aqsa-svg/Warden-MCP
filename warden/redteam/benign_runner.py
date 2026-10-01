@@ -144,7 +144,9 @@ async def run_suite(
     `make_model` is a zero-arg factory returning a fresh ModelCall per scenario, so the
     real Gemini client is created lazily and tests can inject a stub.
     """
-    done_before = journal.done_scenarios(model)
+    # Hash-aware: a scenario recorded under different code (e.g. before a policy
+    # change) does not count as done, so it is re-run rather than left stale.
+    done_before = journal.done_scenarios(model, source_hash())
     todo = [s for s in SCENARIOS if s.scenario_id not in done_before]
     recorded: list[BenignRecord] = []
 

@@ -38,9 +38,9 @@ def benign_status(
     from warden.redteam.benign_journal import BenignJournal
 
     journal = BenignJournal(Path(benign_path))
-    done = journal.done_scenarios(model)
-    typer.echo(f"model {model}")
-    typer.echo(f"benign suite: {len(done)}/{len(SCENARIOS)} recorded")
+    done = journal.done_scenarios(model, source_hash())
+    typer.echo(f"model {model}  ·  source hash {source_hash()}")
+    typer.echo(f"benign suite: {len(done)}/{len(SCENARIOS)} recorded under current code")
     for scenario in SCENARIOS:
         mark = "done" if scenario.scenario_id in done else "    "
         typer.echo(f"  [{mark}] {scenario.scenario_id:<28} {scenario.stratum.value}")
@@ -104,9 +104,9 @@ def benign_run(
             f"  {record.scenario_id:<28} {record.observed.value:<11} "
             f"(expected {record.expected.value}){flag}"
         )
-    done = journal.done_scenarios(model)
+    done = journal.done_scenarios(model, source_hash())
     typer.echo(f"\nthis run recorded {len(recorded)} scenario(s); "
-               f"{len(done)} total recorded.")
+               f"{len(done)}/15 recorded under current code.")
 
 DEFAULT_DB = "var/warden.db"
 DEFAULT_POLICY = "policies/demo.yaml"

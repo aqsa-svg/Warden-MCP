@@ -43,13 +43,18 @@ def test_the_four_irreducible_cases_are_present() -> None:
         assert scenario_id in BY_ID
 
 
-def test_the_split_pairs_have_opposite_expectations() -> None:
-    """Untainted escalates (designed); tainted is hard-blocked (irreducible). If these
-    ever matched, the suite would not be measuring the provenance distinction."""
+def test_comms_pair_splits_on_taint() -> None:
+    """Exfiltration: untainted escalates, tainted is hard-blocked (the one irreducible
+    hard-block FP). Disclosure is not a confirm-and-proceed action, so it stays DENY."""
     assert BY_ID["benign-comms-untainted"].expected is Expected.ESCALATE
     assert BY_ID["benign-comms-tainted"].expected is Expected.HARD_BLOCK
+
+
+def test_both_erasure_cases_escalate() -> None:
+    """ADR 0004: a destructive op is human-confirmed regardless of taint, so neither
+    erasure case hard-blocks -- the fix for the user-authorised-deletion FP."""
     assert BY_ID["benign-erasure-untainted"].expected is Expected.ESCALATE
-    assert BY_ID["benign-erasure-tainted"].expected is Expected.HARD_BLOCK
+    assert BY_ID["benign-erasure-tainted"].expected is Expected.ESCALATE
 
 
 def test_untainted_cases_are_short_by_necessity() -> None:
@@ -183,27 +188,34 @@ def _boundary_taint_by_scenario() -> dict[str, tuple[Stratum, Expected, bool | N
     return out
 
 
-def test_untainted_boundary_calls_are_short_by_necessity() -> None:
-    """Structural confound: an untainted boundary call must be the first tool call, so
-    every ESCALATE case is SHORT. If this ever fails, the taint model changed."""
+def test_untainted_boundary_structural_fact_holds() -> None:
+    """The residual structural fact after ADR 0004: an UNTAINTED boundary call must be
+    the first tool call, so any untainted-boundary ESCALATE case is SHORT. (Tainted
+    destructive calls also escalate now, at any length -- that is checked separately.)"""
     table = _boundary_taint_by_scenario()
     for scenario_id, (stratum, expected, tainted) in table.items():
-        if expected is Expected.ESCALATE:
-            assert tainted is False, scenario_id
+        if expected is Expected.ESCALATE and tainted is False:
             assert stratum is Stratum.SHORT, scenario_id
 
 
-def test_hard_block_cases_are_spread_across_strata() -> None:
-    """Design fix: the tainted HARD_BLOCK cases are NOT all in one stratum, so the
-    hard-block rate is not confounded with length. If they collapse into one stratum,
-    the per-stratum FPR becomes an artifact of placement again."""
+def test_escalation_is_no_longer_pinned_to_one_stratum() -> None:
+    """ADR 0004 broke the confound: a tainted destructive op escalates at any length,
+    so escalation now appears across strata rather than only SHORT."""
     table = _boundary_taint_by_scenario()
-    strata = {
+    escalate_strata = {
         stratum
-        for _id, (stratum, expected, tainted) in table.items()
+        for _id, (stratum, expected, _t) in table.items()
+        if expected is Expected.ESCALATE
+    }
+    assert len(escalate_strata) >= 2, escalate_strata
+
+
+def test_the_only_hard_block_is_tainted_exfil() -> None:
+    """After ADR 0004 the sole remaining hard-block FP is tainted outbound comms;
+    destructive no longer hard-blocks."""
+    hard = {
+        _id
+        for _id, (_s, expected, _t) in _boundary_taint_by_scenario().items()
         if expected is Expected.HARD_BLOCK
     }
-    assert strata == {Stratum.MEDIUM, Stratum.LONG}
-    for _id, (_stratum, expected, tainted) in table.items():
-        if expected is Expected.HARD_BLOCK:
-            assert tainted is True, _id
+    assert hard == {"benign-comms-tainted"}

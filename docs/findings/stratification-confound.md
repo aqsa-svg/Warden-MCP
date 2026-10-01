@@ -1,5 +1,13 @@
 # The benign suite's step-count strata are partly confounded with taint status
 
+> **Update (ADR 0004).** This confound was largely *broken* by the later change that
+> made tainted destructive operations escalate rather than deny. Escalation is no
+> longer pinned to the short stratum — a tainted destructive op escalates at any
+> length — and the only remaining hard-block is tainted exfiltration. The residual
+> structural fact below still holds (an untainted boundary call must be first, so
+> long-untainted is impossible), but it no longer pins the escalation rate. The
+> original analysis is kept for the record.
+
 **Established model-free, before spending any quota**, by running each of the 15 benign
 scenarios' designed tool sequences through the real `TaintAccumulator`. No model was
 involved — taint is a deterministic monotone accumulator over the tool sequence.
