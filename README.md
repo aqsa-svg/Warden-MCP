@@ -5,7 +5,7 @@ provenance of content entering the agent's context, and denies or escalates tool
 whose arguments were derived from untrusted content.
 
 **Status.** The gateway, policy engine, taint tracker, audit log, red-team harness and
-benign suite are built, tested (242 passing, `mypy --strict` clean) and verified. The
+benign suite are built, tested (256 passing, `mypy --strict` clean) and verified. The
 two measured tables below are **pending a re-run under the current frozen code hash**
 (`sha256:63ffae14a835`): all calibration recorded so far predates it, and this project
 does not report a number produced by code it can no longer reproduce. The placeholders
@@ -151,7 +151,11 @@ tainted cases block, the result is direct evidence that taint — not length —
 Established model-free before any quota was spent
 ([detail](docs/findings/stratification-confound.md)).
 
-### A finding that *destroyed measurability* (different category)
+### Findings that *destroyed measurability* (a different category)
+
+These did not skew a number in a known direction — they stopped a number from being
+trustworthy at all, which is the same category as each other and distinct from the biases
+above.
 
 **8. Retrying a per-day quota error.**
 This is distinct in kind from the biases above: it did not skew a number, it prevented
@@ -168,9 +172,23 @@ The general shape is worth stating on its own: *a retry policy that cannot disti
 transient from exhausted will convert a recoverable pause into an unrecoverable one, and
 do it silently, because retrying is what a retry loop is supposed to do.*
 
+**9. Attack calibration rows were produced ad hoc, with no runner behind them, so the
+headline table was not reproducible.** Discovered by tracing call sites rather than by any
+failing test — `record_attempt` was defined but never called anywhere in the package, and
+the rows in the journal were indistinguishable from rows a runner would have written. This
+is a different class from the biases above: those were numbers that could have been wrong
+in a known direction; this was a number that could not be *verified at all*. Same category
+as the per-day quota retry — a failure of measurability, not of measurement. Fixed by
+building the attack-calibration runner (`warden/redteam/attack_runner.py`, wired to
+`warden redteam calibrate`), making it hash-aware and resumable, and making the journal
+**refuse to record an unpinned attempt** (`UnpinnedAttempt`) so the ad-hoc path cannot be
+taken again even by accident. The legacy unpinned rows are kept, not deleted: the re-run
+under the frozen hash becomes a check on whether the ad-hoc numbers reproduce, and a
+`3/3` that comes back `2/3` would itself be a finding about unreproducible measurement.
+
 ### A data point excluded by hand, and why that is the honest move
 
-**9. One `priv-poisoned-deletion` attempt lost to a tooling error.**
+**10. One `priv-poisoned-deletion` attempt lost to a tooling error.**
 A shell loop driven through the WSL layer expanded a variable to empty, so two intended
 runs wrote to the same directory and a later `rm -rf` destroyed one run's call-log rows.
 The attempt was *observed* (it executed) but is *ungraded* (no rows survived to grade).
@@ -344,9 +362,12 @@ attack.
 ```
 cp .env.example .env          # set GEMINI_API_KEY and DEMO_EMAIL_API_KEY
 uv sync --extra dev
-uv run pytest                                             # 242 tests
-uv run python -m mypy --strict warden                    # clean, 60 files
-uv run python -m warden.cli redteam calibrate --dry-run  # 0 model requests
+uv run pytest                                             # 256 tests
+uv run python -m mypy --strict warden                    # clean, 61 files
+uv run python -m warden.cli redteam calibrate --dry-run  # preflight, 0 model requests
+uv run python -m warden.cli redteam calibrate --status   # remaining runs, 0 requests
+uv run python -m warden.cli redteam calibrate            # LIVE attack re-run (spends quota)
+uv run python -m warden.cli benign run                   # LIVE benign suite (spends quota)
 uv run python -m warden.cli report                        # regenerate docs/RESULTS.md
 ```
 
@@ -361,19 +382,21 @@ uv run python -m warden.cli report                        # regenerate docs/RESU
 
 ### Cost envelope
 
-Calibration is the only part that spends model requests.
+Calibration is the only part that spends model requests. The free Gemini tier allows
+**20 requests per day per model** (default daily budget 18, `warden/config.py`), so both
+suites resume across days from append-only journals rather than running in one sitting.
 
-| | requests |
-|---|---|
-| one calibration run | ~4–5 |
-| 5 base templates × n=3 | ~75 |
-| ~20 mutations × n=1 | ~100 |
+| suite | runs | ~requests | ~quota days |
+|---|---|---|---|
+| attack re-run — 4 templates × n=3, ~5 req/run | 12 | ~60 | ~4 |
+| benign suite — 15 scenarios × 1, multi-step | 15 | several more | ~3 |
 
-The free Gemini tier allows **20 requests per day per model**, so the default daily
-budget is 18 (`warden/config.py`), and calibration is designed to be resumed across days
-from an append-only journal rather than completed in one sitting. On a paid key, set a
-billing budget alert before running the suite — the request cap in the runner bounds a
-runaway loop, but it is not a substitute for a billing alarm.
+`warden redteam calibrate --status` prints the live remaining count and the day estimate
+from the journal. **The attack suite is four templates, not three** — the exfil category
+has two (`exfil-escalation` and `exfil-diagnostic`) — so the re-run is ~60 requests over
+~4 quota days, not the ~45/3 that a three-template count would suggest. On a paid key, set
+a billing budget alert before running: the request cap bounds a runaway loop but is not a
+substitute for a billing alarm.
 
 ---
 

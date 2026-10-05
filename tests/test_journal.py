@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from warden.redteam.journal import (
     Attempt,
     AttemptOutcome,
     Journal,
     Plan,
+    UnpinnedAttempt,
     outstanding,
     requests_needed,
 )
@@ -18,14 +21,28 @@ OTHER = "gemini-3.1-pro-preview"
 
 
 def attempt(
-    template: str, outcome: AttemptOutcome, model: str = MODEL, run: str = "r"
+    template: str,
+    outcome: AttemptOutcome,
+    model: str = MODEL,
+    run: str = "r",
+    source_hash: str = "h",
 ) -> Attempt:
-    return Attempt(template, None, run, outcome, 1, model)
+    # A non-empty hash by default: the journal now refuses to record an unpinned attempt,
+    # so a test row must carry one just as a real recording does.
+    return Attempt(template, None, run, outcome, 1, model, source_hash)
+
+
+def _append_legacy_row(journal: Journal, attempt_: Attempt) -> None:
+    """Write a pre-hash (blank source_hash) row straight to the file, bypassing the
+    record() guard -- the only way such a row can exist now, and exactly how the real
+    legacy rows got there before the guard existed."""
+    with open(journal.path, "a", encoding="utf-8") as handle:
+        handle.write(attempt_.to_json() + "\n")
 
 
 def test_records_round_trip(tmp_path: Path) -> None:
     journal = Journal(tmp_path / "j.jsonl")
-    original = Attempt("t1", "seed-7", "run-1", AttemptOutcome.SUCCESS, 99, MODEL)
+    original = Attempt("t1", "seed-7", "run-1", AttemptOutcome.SUCCESS, 99, MODEL, "h")
     journal.record(original)
     assert journal.attempts() == [original]
 
@@ -82,11 +99,22 @@ def test_tally_filters_by_source_hash_when_requested(tmp_path: Path) -> None:
     journal = Journal(tmp_path / "j.jsonl")
     journal.record(Attempt("t1", None, "a", AttemptOutcome.SUCCESS, 1, MODEL, "h1"))
     journal.record(Attempt("t1", None, "b", AttemptOutcome.SUCCESS, 1, MODEL, "h2"))
-    journal.record(Attempt("t1", None, "c", AttemptOutcome.FAILURE, 1, MODEL, ""))
+    _append_legacy_row(  # a pre-hash row, which record() would now refuse
+        journal, Attempt("t1", None, "c", AttemptOutcome.FAILURE, 1, MODEL, "")
+    )
     assert journal.tally("t1", MODEL).completed == 3  # None -> every hash
     assert journal.tally("t1", MODEL, source_hash="h1") == (1, 1, 0)
     assert journal.tally("t1", MODEL, source_hash="h2") == (1, 1, 0)
     assert journal.tally("t1", MODEL, source_hash="absent") == (0, 0, 0)
+
+
+def test_record_refuses_an_unpinned_attempt(tmp_path: Path) -> None:
+    """The ad-hoc path that produced the original, unreproducible rows must be
+    unreachable: an attempt with no source hash is rejected, not silently stored."""
+    journal = Journal(tmp_path / "j.jsonl")
+    with pytest.raises(UnpinnedAttempt):
+        journal.record(Attempt("t1", None, "a", AttemptOutcome.SUCCESS, 1, MODEL, ""))
+    assert journal.attempts() == []  # and nothing was written
 
 
 def test_outstanding_computes_only_what_is_missing(tmp_path: Path) -> None:

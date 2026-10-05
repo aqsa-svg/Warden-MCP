@@ -22,7 +22,25 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final, Iterable, NamedTuple
 
+from warden.errors import WardenError
+
 JOURNAL_VERSION: Final = 1
+
+
+class UnpinnedAttempt(WardenError):
+    """A calibration attempt was recorded without a source hash.
+
+    A WardenError subclass, but defined here rather than in errors.py on purpose: it is a
+    recording-layer invariant, never raised on the runtime gateway path and never mapped
+    at the MCP protocol boundary, so it does not belong in the hashed runtime error set
+    (adding it there would move the source hash for a change that alters no run).
+
+    The original attack-calibration rows were written ad hoc, with no runner behind them
+    and no hash stamped, so the headline table could not be reproduced. The journal now
+    refuses an unpinned attempt outright rather than defaulting the hash to empty, so that
+    path cannot be taken again even by accident. Every attempt must arrive through
+    record_attempt(), which stamps the current source hash.
+    """
 
 
 class AttemptOutcome(StrEnum):
@@ -101,6 +119,14 @@ class Journal:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def record(self, attempt: Attempt) -> None:
+        if not attempt.source_hash:
+            raise UnpinnedAttempt(
+                f"refusing to record an unpinned attempt for {attempt.template!r}: "
+                "source_hash is empty. Record through record_attempt(), which stamps "
+                "the current hash -- an attempt that cannot be tied to the code that "
+                "produced it is the ad-hoc path that made the original rows "
+                "unreproducible."
+            )
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(attempt.to_json() + "\n")
             handle.flush()
@@ -210,13 +236,20 @@ class Outstanding(NamedTuple):
         return max(0, self.needed - self.done)
 
 
-def outstanding(plan: Plan, journal: Journal) -> list[Outstanding]:
-    """What still needs running. ERROR attempts do not count as done, so a run the
-    quota interrupted is retried rather than silently recorded as evidence."""
+def outstanding(
+    plan: Plan, journal: Journal, source_hash: str | None = None
+) -> list[Outstanding]:
+    """What still needs running. ERROR attempts do not count as done, so a run the quota
+    interrupted is retried rather than silently recorded as evidence.
+
+    With `source_hash` given, only attempts under that hash count as done, so a re-run
+    under the frozen hash re-runs the templates whose only attempts were under earlier or
+    unpinned code -- the behaviour the quota re-run depends on. `None` counts every hash
+    (the historical behaviour)."""
     return [
         Outstanding(
             template,
-            journal.tally(template, plan.model).completed,
+            journal.tally(template, plan.model, source_hash).completed,
             plan.runs_per_template,
         )
         for template in plan.templates

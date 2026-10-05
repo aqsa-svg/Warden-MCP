@@ -209,22 +209,26 @@ def calibrate(
     --dry-run spends nothing: it runs every free, model-free invariant for every
     template so a broken one is reported before any quota is committed.
     """
+    journal = Journal(Path(journal_path))
+    current = source_hash()
+
     if status:
-        journal = Journal(Path(journal_path))
         plan = Plan(
             templates=tuple(sorted(set(BY_SCENARIO) | set(ARG_SCENARIO))),
             runs_per_template=RUNS_PER_TEMPLATE,
             model=model,
         )
-        items = outstanding(plan, journal)
-        typer.echo(f"model {model}   n={RUNS_PER_TEMPLATE} per template")
+        items = outstanding(plan, journal, source_hash=current)
+        typer.echo(
+            f"model {model}   n={RUNS_PER_TEMPLATE} per template   hash {current}"
+        )
         typer.echo(f"journal {journal_path}")
         typer.echo("")
         for item in items:
-            tally = journal.tally(item.template, model)
+            tally = journal.tally(item.template, model, current)
             note = f"  ({tally.errors} errored, retried)" if tally.errors else ""
             typer.echo(
-                f"  {item.template:<28} {tally.fraction:>7} succeeded   "
+                f"  {item.template:<28} {tally.fraction:>7} under current hash   "
                 f"{item.remaining} run(s) remaining{note}"
             )
         needed = requests_needed(items, REQUESTS_PER_RUN)
@@ -236,12 +240,8 @@ def calibrate(
         )
         raise typer.Exit()
 
-    if not dry_run:
-        typer.echo(
-            "calibration is not wired yet; --dry-run runs the preflight invariants"
-        )
-        raise typer.Exit(code=2)
-
+    # Both --dry-run and a live run gate on the same preflight: a template must pass its
+    # free, model-free invariants before any quota is spent on it.
     reports = preflight(policy_path=policy)
     failed = 0
     for report in reports:
@@ -253,11 +253,7 @@ def calibrate(
             typer.echo(f"  {mark} {check.name:<28} {check.detail}")
         failed += 0 if report.passed else 1
 
-    # Source provenance: every recorded attempt for a template must share the source
-    # hash. A mismatch means some run executed against different code, so its rate is
-    # not comparable -- surface it before any quota is spent on top of it.
-    current = source_hash()
-    conflicts = Journal(Path(journal_path)).hash_conflicts(current)
+    conflicts = journal.hash_conflicts(current)
     typer.echo("")
     typer.echo(f"source hash: {current}")
     if conflicts:
@@ -267,20 +263,72 @@ def calibrate(
                 f"not the current {current}"
             )
 
-    typer.echo("")
-    typer.echo(
-        f"{len(reports) - failed}/{len(reports)} template(s) ready. "
-        f"0 model requests spent."
-    )
-    if failed:
-        typer.echo(f"{failed} template(s) would be skipped by calibration.")
-    if conflicts:
+    if dry_run:
+        typer.echo("")
         typer.echo(
-            f"{len(conflicts)} template(s) have calibration recorded under a "
-            f"different source hash; re-run them before trusting their rate."
+            f"{len(reports) - failed}/{len(reports)} template(s) ready. "
+            f"0 model requests spent."
         )
-    if failed or conflicts:
+        if failed:
+            typer.echo(f"{failed} template(s) would be skipped by calibration.")
+        if conflicts:
+            typer.echo(
+                f"{len(conflicts)} template(s) have calibration recorded under a "
+                f"different source hash; re-run them before trusting their rate."
+            )
+        if failed or conflicts:
+            raise typer.Exit(code=1)
+        raise typer.Exit()
+
+    # -- live run: spends quota --------------------------------------------------
+    # Conflicts are expected here (they are exactly what a re-run resolves), so we do not
+    # refuse on them -- only on a preflight failure, which would spend quota on a broken
+    # template.
+    if failed:
+        typer.echo("")
+        typer.echo(f"refusing to spend quota: {failed} template(s) fail preflight.")
         raise typer.Exit(code=1)
+
+    import asyncio
+    import os
+    import time
+
+    from dotenv import load_dotenv
+
+    from warden.demo_agent.agent import SYSTEM
+    from warden.demo_agent.gemini import gemini_model
+    from warden.gateway.config import credential_env_vars
+    from warden.redteam.attack_runner import ATTACK_VAR_DIR, run_suite
+
+    load_dotenv()
+    absent = [n for n in credential_env_vars() if not os.environ.get(n)]
+    if absent:
+        typer.echo(f"error: credentials not set: {', '.join(absent)}")
+        raise typer.Exit(code=2)
+    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+        typer.echo("error: GEMINI_API_KEY not set")
+        raise typer.Exit(code=2)
+
+    from google import genai
+
+    client = genai.Client()
+
+    def make_model() -> object:
+        return gemini_model(client, SYSTEM, model)
+
+    def now_us() -> int:
+        return time.time_ns() // 1_000
+
+    recorded = asyncio.run(
+        run_suite(
+            journal=journal, var_dir=Path(ATTACK_VAR_DIR),
+            make_model=make_model, model=model, now_us=now_us, policy_path=policy,
+        )
+    )
+    typer.echo("")
+    for attempt in recorded:
+        typer.echo(f"  {attempt.template:<28} {attempt.outcome.value}")
+    typer.echo(f"\nthis run recorded {len(recorded)} attempt(s) under {current}.")
 
 
 if __name__ == "__main__":

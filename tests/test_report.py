@@ -27,6 +27,14 @@ def _record(journal: Journal, run: str, source_hash: str) -> None:
     )
 
 
+def _append_legacy(journal: Journal, run: str) -> None:
+    """A pre-hash (blank source_hash) row, written straight to the file: record() now
+    refuses an unpinned attempt, so this is the only way a legacy row can exist."""
+    line = Attempt(TEMPLATE, None, run, AttemptOutcome.SUCCESS, 1, MODEL, "").to_json()
+    with open(journal.path, "a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+
+
 def _row(journal: Journal):  # type: ignore[no-untyped-def]
     return next(
         r for r in attack_rows(journal, MODEL, CURRENT) if r.template == TEMPLATE
@@ -56,7 +64,7 @@ def test_blank_hash_attempts_are_also_excluded(tmp_path: Path) -> None:
     """Pre-hashing records (blank source_hash) cannot be confirmed against current code,
     so they are excluded exactly like a mismatched hash."""
     journal = Journal(tmp_path / "j.jsonl")
-    _record(journal, "a", "")
+    _append_legacy(journal, "a")
     assert "pending" in _row(journal).ungoverned
 
 
