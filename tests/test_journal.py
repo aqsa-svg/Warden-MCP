@@ -75,6 +75,20 @@ def test_attempts_against_another_model_are_not_evidence(tmp_path: Path) -> None
     assert journal.tally("t1", OTHER) == (1, 1, 0)
 
 
+def test_tally_filters_by_source_hash_when_requested(tmp_path: Path) -> None:
+    """The report pins a rate to the current source hash, so a run produced by code
+    that no longer matches is not counted. The default (None) still counts every hash,
+    which the status and resume paths rely on."""
+    journal = Journal(tmp_path / "j.jsonl")
+    journal.record(Attempt("t1", None, "a", AttemptOutcome.SUCCESS, 1, MODEL, "h1"))
+    journal.record(Attempt("t1", None, "b", AttemptOutcome.SUCCESS, 1, MODEL, "h2"))
+    journal.record(Attempt("t1", None, "c", AttemptOutcome.FAILURE, 1, MODEL, ""))
+    assert journal.tally("t1", MODEL).completed == 3  # None -> every hash
+    assert journal.tally("t1", MODEL, source_hash="h1") == (1, 1, 0)
+    assert journal.tally("t1", MODEL, source_hash="h2") == (1, 1, 0)
+    assert journal.tally("t1", MODEL, source_hash="absent") == (0, 0, 0)
+
+
 def test_outstanding_computes_only_what_is_missing(tmp_path: Path) -> None:
     journal = Journal(tmp_path / "j.jsonl")
     journal.record(attempt("t1", AttemptOutcome.FAILURE, run="a"))

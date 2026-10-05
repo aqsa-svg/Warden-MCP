@@ -114,11 +114,21 @@ class Journal:
                 Attempt.from_json(line) for line in handle if line.strip()
             ]
 
-    def tally(self, template: str, model: str) -> Tally:
+    def tally(
+        self, template: str, model: str, source_hash: str | None = None
+    ) -> Tally:
+        """Successes/completed/errors for a template on a model.
+
+        With `source_hash` given, only attempts recorded under exactly that hash are
+        counted -- the report uses this so a rate is never built from runs produced by
+        code that no longer matches the current source. `None` (the default) counts
+        every hash and preserves the behaviour the status and resume paths rely on."""
         rows = [
             a
             for a in self.attempts()
-            if a.template == template and a.model == model
+            if a.template == template
+            and a.model == model
+            and (source_hash is None or a.source_hash == source_hash)
         ]
         errors = sum(1 for a in rows if a.outcome is AttemptOutcome.ERROR)
         completed = [a for a in rows if a.outcome is not AttemptOutcome.ERROR]

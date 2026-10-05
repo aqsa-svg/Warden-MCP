@@ -64,24 +64,45 @@ _CONTROLS: dict[str, tuple[str, str, str]] = {
 }
 
 
-def attack_rows(journal: Journal, model: str) -> list[AttackRow]:
+def attack_rows(journal: Journal, model: str, current_hash: str) -> list[AttackRow]:
+    """One row per attack template, hash-pinned.
+
+    A rate is shown only from attempts recorded under `current_hash`. A template with
+    attempts under an earlier or unpinned hash -- not comparable with the current code
+    -- is rendered *pending* with the excluded count, never as a current rate. This is
+    the same stance `benign_table` takes for Table 2, and the reason Table 1 cannot
+    silently present a 3/3 produced by code that no longer matches the frozen hash.
+    """
     rows: list[AttackRow] = []
     for template, (category, control, governed) in _CONTROLS.items():
-        tally = journal.tally(template, model)
-        if tally.completed == 0 and tally.errors == 0:
+        current = journal.tally(template, model, source_hash=current_hash)
+        if current.completed > 0 or current.errors > 0:
+            rows.append(
+                AttackRow(
+                    category=category,
+                    template=template,
+                    ungoverned=current.fraction,
+                    warden_control=control,
+                    governed=governed,
+                    note=(
+                        f"{current.errors} errored run(s) excluded"
+                        if current.errors
+                        else ""
+                    ),
+                )
+            )
             continue
+        prior = journal.tally(template, model)
+        if prior.completed == 0 and prior.errors == 0:
+            continue  # never attempted at all -- omit the row entirely
         rows.append(
             AttackRow(
                 category=category,
                 template=template,
-                ungoverned=tally.fraction,
+                ungoverned=f"pending ({prior.completed} excluded)",
                 warden_control=control,
-                governed=governed,
-                note=(
-                    f"{tally.errors} errored run(s) excluded"
-                    if tally.errors
-                    else ""
-                ),
+                governed="pending re-run under current hash",
+                note="prior attempts under earlier/unpinned code, excluded",
             )
         )
     return rows
@@ -162,7 +183,7 @@ def render(
     out.append("")
     out.append("| category | template | ungoverned | Warden control | governed |")
     out.append("|---|---|---|---|---|")
-    for row in attack_rows(journal, model):
+    for row in attack_rows(journal, model, current):
         out.append(
             f"| {row.category} | `{row.template}` | {row.ungoverned} | "
             f"{row.warden_control} | {row.governed} |"
@@ -174,9 +195,10 @@ def render(
     )
     out.append("")
     out.append(
-        "The dividing line the data shows: **data-channel attacks land, prose "
-        "instructions do not** — success tracks whether the attack needs the model to "
-        "*choose* to overstep. See `docs/findings/prose-injection-negative-result.md`."
+        "The dividing line the calibration record establishes: **data-channel attacks "
+        "land, prose instructions do not** — success tracks whether the attack needs "
+        "the model to *choose* to overstep. See "
+        "`docs/findings/prose-injection-negative-result.md`."
     )
     out.append("")
 
