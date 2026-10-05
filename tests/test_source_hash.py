@@ -26,7 +26,7 @@ def test_hash_covers_runtime_and_definitions_not_tooling() -> None:
     report or grading change never spuriously invalidates calibration."""
     from warden.source_hash import _relevant_files
 
-    covered = {p.as_posix() for p in _relevant_files()}
+    covered = {p.as_posix() for p in _relevant_files("gemini")}
     # runtime + definitions are covered
     assert any("warden/policy/engine.py" in c for c in covered)
     assert any("warden/gateway/wrapper.py" in c for c in covered)
@@ -40,6 +40,20 @@ def test_hash_covers_runtime_and_definitions_not_tooling() -> None:
     assert not any("warden/redteam/journal.py" in c for c in covered)
     assert not any("warden/cli.py" in c for c in covered)
     assert not any("warden/source_hash.py" in c for c in covered)
+
+
+def test_provider_hash_includes_only_the_active_adapter() -> None:
+    """Each model line is hashed with its own adapter and not the other's, so adding a
+    second provider never moves the first's hash and the two never collide."""
+    from warden.source_hash import _relevant_files
+
+    gem = {p.as_posix() for p in _relevant_files("gemini")}
+    orr = {p.as_posix() for p in _relevant_files("openrouter")}
+    assert any("warden/demo_agent/gemini.py" in c for c in gem)
+    assert not any("warden/demo_agent/openrouter.py" in c for c in gem)
+    assert any("warden/demo_agent/openrouter.py" in c for c in orr)
+    assert not any("warden/demo_agent/gemini.py" in c for c in orr)
+    assert source_hash("gemini") != source_hash("openrouter")
 
 
 def test_recorded_attempts_carry_the_current_hash(tmp_path: Path) -> None:

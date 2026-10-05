@@ -22,7 +22,7 @@ from warden.redteam.benign import SCENARIOS, Expected, Stratum
 from warden.redteam.benign_journal import BenignJournal
 from warden.redteam.benign_oracle import StratumRates, rates_by_stratum
 from warden.redteam.journal import Journal
-from warden.source_hash import source_hash
+from warden.source_hash import DEFAULT_PROVIDER, source_hash
 
 
 @dataclass(frozen=True)
@@ -153,9 +153,10 @@ def render(
     benign: BenignJournal,
     *,
     model: str = DEFAULT_MODEL,
+    provider: str = DEFAULT_PROVIDER,
     current_hash: str | None = None,
 ) -> str:
-    current = current_hash if current_hash is not None else source_hash()
+    current = current_hash if current_hash is not None else source_hash(provider)
     conflicts = journal.hash_conflicts(current)
 
     out: list[str] = []
@@ -244,8 +245,12 @@ def write_report(
     out_path: Path,
     *,
     model: str = DEFAULT_MODEL,
+    provider: str = DEFAULT_PROVIDER,
 ) -> str:
-    text = render(Journal(journal_path), BenignJournal(benign_path), model=model)
+    text = render(
+        Journal(journal_path), BenignJournal(benign_path),
+        model=model, provider=provider,
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(text, encoding="utf-8")
     return text

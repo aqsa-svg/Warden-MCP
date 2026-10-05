@@ -31,7 +31,7 @@ from warden.log.models import RunVariant
 from warden.redteam.benign import SCENARIOS, BenignScenario
 from warden.redteam.benign_journal import BenignJournal, BenignRecord
 from warden.redteam.benign_oracle import classify_run
-from warden.source_hash import source_hash
+from warden.source_hash import DEFAULT_PROVIDER, source_hash
 
 
 def _forwarded_env() -> dict[str, str]:
@@ -100,8 +100,10 @@ def grade_and_record(
     run_id: str,
     timestamp_us: int,
     model: str = DEFAULT_MODEL,
+    provider: str = DEFAULT_PROVIDER,
 ) -> BenignRecord:
-    """Classify a completed benign run and append it to the journal, hash-stamped."""
+    """Classify a completed benign run and append it to the journal, hash-stamped with the
+    active provider's source hash so a second model's FPR is a separate line."""
     with sqlite3.connect(db_path) as conn:
         outcome = classify_run(conn, run_id)
     record = BenignRecord(
@@ -111,7 +113,7 @@ def grade_and_record(
         expected=scenario.expected,
         timestamp_us=timestamp_us,
         model=model,
-        source_hash=source_hash(),
+        source_hash=source_hash(provider),
     )
     journal.record(record)
     return record
@@ -131,6 +133,7 @@ async def run_suite(
     var_dir: Path,
     make_model: Any,
     model: str = DEFAULT_MODEL,
+    provider: str = DEFAULT_PROVIDER,
     now_us: Any,
 ) -> list[BenignRecord]:
     """Run every outstanding benign scenario for `model`, resumably, until done or the
@@ -146,7 +149,7 @@ async def run_suite(
     """
     # Hash-aware: a scenario recorded under different code (e.g. before a policy
     # change) does not count as done, so it is re-run rather than left stale.
-    done_before = journal.done_scenarios(model, source_hash())
+    done_before = journal.done_scenarios(model, source_hash(provider))
     todo = [s for s in SCENARIOS if s.scenario_id not in done_before]
     recorded: list[BenignRecord] = []
 
@@ -170,7 +173,7 @@ async def run_suite(
             raise
         record = grade_and_record(
             db_path, scenario, journal, run_id=run_id,
-            timestamp_us=now_us(), model=model,
+            timestamp_us=now_us(), model=model, provider=provider,
         )
         recorded.append(record)
 

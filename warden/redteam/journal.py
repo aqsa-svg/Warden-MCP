@@ -198,13 +198,16 @@ def record_attempt(
     outcome: AttemptOutcome,
     timestamp_us: int,
     model: str,
+    provider: str = "gemini",  # == source_hash.DEFAULT_PROVIDER
     mutation_seed: str | None = None,
 ) -> Attempt:
-    """Record an attempt, stamping the current source hash automatically.
+    """Record an attempt, stamping the provider-scoped source hash automatically.
 
-    Every recording of a calibration result must go through here rather than
-    constructing an Attempt by hand, so the source hash can never be omitted and a
-    stale run can always be detected after the fact."""
+    Every recording of a calibration result must go through here rather than constructing
+    an Attempt by hand, so the source hash can never be omitted and a stale run can always
+    be detected after the fact. `provider` selects which adapter is folded into the hash,
+    so a Grok run is pinned to `source_hash("openrouter")` and a Gemini run to
+    `source_hash("gemini")` -- two independent model lines in one journal."""
     from warden.source_hash import source_hash
 
     attempt = Attempt(
@@ -214,7 +217,7 @@ def record_attempt(
         outcome=outcome,
         timestamp_us=timestamp_us,
         model=model,
-        source_hash=source_hash(),
+        source_hash=source_hash(provider),
     )
     journal.record(attempt)
     return attempt

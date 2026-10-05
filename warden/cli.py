@@ -28,18 +28,76 @@ benign = typer.Typer(add_completion=False, help="Benign suite (FPR denominator).
 app.add_typer(benign, name="benign")
 
 
+def _default_model(provider: str, model: str) -> str:
+    """Resolve the model id for a provider when --model is left blank. Pure (no client),
+    so status/report use it to key the journal the same way a live run does."""
+    if model:
+        return model
+    if provider == "openrouter":
+        from warden.demo_agent.openrouter import DEFAULT_MODEL as OPENROUTER_DEFAULT
+
+        return OPENROUTER_DEFAULT
+    return DEFAULT_MODEL
+
+
+def _make_model_factory(provider: str, model: str) -> tuple[object, str]:
+    """Build a zero-arg ModelCall factory for the provider and return (factory, model id),
+    checking the provider's credentials. The agent is provider-isolated, so this is the
+    only place the CLI chooses a brain."""
+    import os
+
+    if provider == "openrouter":
+        from warden.demo_agent.agent import SYSTEM
+        from warden.demo_agent.openrouter import make_client, openrouter_model
+
+        key = os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            typer.echo("error: OPENROUTER_API_KEY not set (needed for --provider openrouter)")
+            raise typer.Exit(code=2)
+        resolved = _default_model(provider, model)
+        client = make_client(key)
+
+        def make_openrouter() -> object:
+            return openrouter_model(client, SYSTEM, resolved)
+
+        return make_openrouter, resolved
+
+    if provider != "gemini":
+        typer.echo(f"error: unknown provider {provider!r} (use gemini or openrouter)")
+        raise typer.Exit(code=2)
+
+    from google import genai
+
+    from warden.demo_agent.agent import SYSTEM
+    from warden.demo_agent.gemini import gemini_model
+
+    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+        typer.echo("error: GEMINI_API_KEY not set")
+        raise typer.Exit(code=2)
+    resolved = _default_model(provider, model)
+    gemini_client = genai.Client()
+
+    def make_gemini() -> object:
+        return gemini_model(gemini_client, SYSTEM, resolved)
+
+    return make_gemini, resolved
+
+
 @benign.command("status")
 def benign_status(
     benign_path: Annotated[str, typer.Option("--journal")] = "var/redteam/benign.jsonl",
-    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+    provider: Annotated[str, typer.Option(help="gemini or openrouter")] = "gemini",
+    model: Annotated[str, typer.Option(help="Defaults to the provider's model.")] = "",
 ) -> None:
     """Show benign-suite progress without spending anything."""
     from warden.redteam.benign import SCENARIOS
     from warden.redteam.benign_journal import BenignJournal
 
+    model = _default_model(provider, model)
+    current = source_hash(provider)
     journal = BenignJournal(Path(benign_path))
-    done = journal.done_scenarios(model, source_hash())
-    typer.echo(f"model {model}  ·  source hash {source_hash()}")
+    done = journal.done_scenarios(model, current)
+    typer.echo(f"model {model}  ·  source hash {current}")
     typer.echo(f"benign suite: {len(done)}/{len(SCENARIOS)} recorded under current code")
     for scenario in SCENARIOS:
         mark = "done" if scenario.scenario_id in done else "    "
@@ -52,7 +110,8 @@ def benign_status(
 def benign_run(
     benign_path: Annotated[str, typer.Option("--journal")] = "var/redteam/benign.jsonl",
     var_dir: Annotated[str, typer.Option("--var")] = "var/benign",
-    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+    provider: Annotated[str, typer.Option(help="gemini or openrouter")] = "gemini",
+    model: Annotated[str, typer.Option(help="Defaults to the provider's model.")] = "",
 ) -> None:
     """Run outstanding benign scenarios through the governed gateway and record results.
 
@@ -65,8 +124,6 @@ def benign_run(
 
     from dotenv import load_dotenv
 
-    from warden.demo_agent.agent import SYSTEM
-    from warden.demo_agent.gemini import gemini_model
     from warden.gateway.config import credential_env_vars
     from warden.redteam.benign_journal import BenignJournal
     from warden.redteam.benign_runner import run_suite
@@ -77,16 +134,9 @@ def benign_run(
         parser_absent = ", ".join(absent)
         typer.echo(f"error: credentials not set: {parser_absent}")
         raise typer.Exit(code=2)
-    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
-        typer.echo("error: GEMINI_API_KEY not set")
-        raise typer.Exit(code=2)
 
-    from google import genai
-
-    client = genai.Client()
-
-    def make_model() -> object:
-        return gemini_model(client, SYSTEM, model)
+    make_model, resolved = _make_model_factory(provider, model)
+    current = source_hash(provider)
 
     def now_us() -> int:
         return time.time_ns() // 1_000
@@ -95,7 +145,7 @@ def benign_run(
     recorded = asyncio.run(
         run_suite(
             journal=journal, var_dir=Path(var_dir),
-            make_model=make_model, model=model, now_us=now_us,
+            make_model=make_model, model=resolved, provider=provider, now_us=now_us,
         )
     )
     for record in recorded:
@@ -104,9 +154,9 @@ def benign_run(
             f"  {record.scenario_id:<28} {record.observed.value:<11} "
             f"(expected {record.expected.value}){flag}"
         )
-    done = journal.done_scenarios(model, source_hash())
+    done = journal.done_scenarios(resolved, current)
     typer.echo(f"\nthis run recorded {len(recorded)} scenario(s); "
-               f"{len(done)}/15 recorded under current code.")
+               f"{len(done)}/15 recorded under {current}.")
 
 DEFAULT_DB = "var/warden.db"
 DEFAULT_POLICY = "policies/demo.yaml"
@@ -121,12 +171,17 @@ def report(
     journal_path: Annotated[str, typer.Option("--journal")] = DEFAULT_JOURNAL,
     benign_path: Annotated[str, typer.Option("--benign")] = DEFAULT_BENIGN_JOURNAL,
     out: Annotated[str, typer.Option("--out")] = DEFAULT_REPORT,
-    model: Annotated[str, typer.Option()] = DEFAULT_MODEL,
+    provider: Annotated[str, typer.Option(help="gemini or openrouter")] = "gemini",
+    model: Annotated[str, typer.Option(help="Defaults to the provider's model.")] = "",
 ) -> None:
     """Render the two measured tables from the calibration record to markdown."""
     from warden.report.generate import write_report
 
-    text = write_report(Path(journal_path), Path(benign_path), Path(out), model=model)
+    model = _default_model(provider, model)
+    text = write_report(
+        Path(journal_path), Path(benign_path), Path(out),
+        model=model, provider=provider,
+    )
     typer.echo(text)
     typer.echo("")
     typer.echo(f"written to {out}")
@@ -201,16 +256,20 @@ def calibrate(
         bool, typer.Option("--status", help="Print calibration progress and exit.")
     ] = False,
     journal_path: Annotated[str, typer.Option("--journal")] = DEFAULT_JOURNAL,
-    model: Annotated[str, typer.Option(help="Model the rates apply to.")] = DEFAULT_MODEL,
+    provider: Annotated[str, typer.Option(help="gemini or openrouter")] = "gemini",
+    model: Annotated[str, typer.Option(help="Defaults to the provider's model.")] = "",
     policy: Annotated[str, typer.Option(help="Policy file.")] = DEFAULT_POLICY,
 ) -> None:
     """Calibrate red-team templates against the ungoverned agent.
 
     --dry-run spends nothing: it runs every free, model-free invariant for every
-    template so a broken one is reported before any quota is committed.
+    template so a broken one is reported before any quota is committed. A live run is
+    pinned to the provider's source hash, so a Grok (--provider openrouter) calibration
+    is a separate model line from Gemini's and never counts toward it.
     """
     journal = Journal(Path(journal_path))
-    current = source_hash()
+    model = _default_model(provider, model)
+    current = source_hash(provider)
 
     if status:
         plan = Plan(
@@ -295,8 +354,6 @@ def calibrate(
 
     from dotenv import load_dotenv
 
-    from warden.demo_agent.agent import SYSTEM
-    from warden.demo_agent.gemini import gemini_model
     from warden.gateway.config import credential_env_vars
     from warden.redteam.attack_runner import ATTACK_VAR_DIR, run_suite
 
@@ -305,16 +362,8 @@ def calibrate(
     if absent:
         typer.echo(f"error: credentials not set: {', '.join(absent)}")
         raise typer.Exit(code=2)
-    if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
-        typer.echo("error: GEMINI_API_KEY not set")
-        raise typer.Exit(code=2)
 
-    from google import genai
-
-    client = genai.Client()
-
-    def make_model() -> object:
-        return gemini_model(client, SYSTEM, model)
+    make_model, resolved = _make_model_factory(provider, model)
 
     def now_us() -> int:
         return time.time_ns() // 1_000
@@ -322,7 +371,8 @@ def calibrate(
     recorded = asyncio.run(
         run_suite(
             journal=journal, var_dir=Path(ATTACK_VAR_DIR),
-            make_model=make_model, model=model, now_us=now_us, policy_path=policy,
+            make_model=make_model, model=resolved, provider=provider,
+            now_us=now_us, policy_path=policy,
         )
     )
     typer.echo("")

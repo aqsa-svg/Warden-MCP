@@ -58,7 +58,7 @@ from warden.redteam.journal import (
 from warden.redteam.oracles import Verdict, grade
 from warden.redteam.payloads import TEMPLATES as PROSE_TEMPLATES
 from warden.redteam.suite import task_for
-from warden.source_hash import source_hash
+from warden.source_hash import DEFAULT_PROVIDER, source_hash
 
 POLICY_PATH: str = "policies/demo.yaml"
 ATTACK_VAR_DIR: str = "var/redteam/attacks"
@@ -162,18 +162,21 @@ async def run_suite(
     make_model: Any,
     now_us: Any,
     model: str = DEFAULT_MODEL,
+    provider: str = DEFAULT_PROVIDER,
     policy_path: str = POLICY_PATH,
     runs_per_template: int = RUNS_PER_TEMPLATE,
 ) -> list[Attempt]:
     """Run every outstanding attack for `model` to n per template, resumably, until done
     or the daily quota is hit.
 
-    Hash-aware resume: only attempts under the current source hash count as done, so a
-    re-run under the frozen hash re-runs templates whose only rows were legacy/unpinned,
-    rather than seeing them as complete. On BudgetExceeded (the per-day fast-fail) it
-    stops cleanly, leaving the interrupted attempt unrecorded so it is retried next day.
+    Hash-aware resume: only attempts under the current provider-scoped source hash count
+    as done, so a re-run re-runs templates whose only rows were legacy/other-provider,
+    rather than seeing them as complete. `provider` pins the hash to the active adapter
+    (gemini vs openrouter), so a Grok run never counts toward Gemini's denominator and
+    vice versa. On BudgetExceeded (the per-day fast-fail) it stops cleanly, leaving the
+    interrupted attempt unrecorded so it is retried next day.
     """
-    current = source_hash()
+    current = source_hash(provider)
     specs = {s.scenario_id: s for s in attack_specs()}
     plan = Plan(
         templates=tuple(specs), runs_per_template=runs_per_template, model=model
@@ -215,6 +218,7 @@ async def run_suite(
                     ),
                     timestamp_us=now_us(),
                     model=model,
+                    provider=provider,
                 )
             )
 

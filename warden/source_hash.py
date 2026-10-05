@@ -22,6 +22,20 @@ _ROOT: Final = Path(__file__).resolve().parent.parent
 _SUFFIXES: Final = (".py", ".yaml", ".json")
 _EXCLUDE_PARTS: Final = ("__pycache__",)
 
+# Provider adapters are the one part of the runtime that is provider-specific. A run uses
+# exactly one of them, so the hash includes only the active provider's adapter and
+# excludes the others. This keeps two model lines independent: adding a second provider's
+# adapter never disturbs the first provider's hash, so the existing (Gemini) calibration
+# stays valid under the same hash it was recorded under.
+DEFAULT_PROVIDER: Final = "gemini"
+_PROVIDER_ADAPTERS: Final = {
+    "gemini": "warden/demo_agent/gemini.py",
+    "openrouter": "warden/demo_agent/openrouter.py",
+}
+_ADAPTER_PATHS: Final = frozenset(
+    (_ROOT / rel).resolve() for rel in _PROVIDER_ADAPTERS.values()
+)
+
 # The hash covers only code that changes what a RUN produces -- the runtime path from
 # agent to gateway to server to log, plus the attack and scenario definitions that are
 # a run's inputs, plus the policies. It deliberately EXCLUDES post-hoc machinery
@@ -51,7 +65,7 @@ _HASHED_PATHS: Final = (
 )
 
 
-def _relevant_files() -> list[Path]:
+def _relevant_files(provider: str) -> list[Path]:
     files: list[Path] = []
     for rel in _HASHED_PATHS:
         target = _ROOT / rel
@@ -63,20 +77,29 @@ def _relevant_files() -> list[Path]:
                     path.is_file()
                     and path.suffix in _SUFFIXES
                     and not any(part in _EXCLUDE_PARTS for part in path.parts)
+                    and path.resolve() not in _ADAPTER_PATHS
                 ):
                     files.append(path)
+    # Exactly one provider adapter is part of a run, so hash only the active one. (The
+    # walk above skipped every adapter; this re-adds the one in use.)
+    active = _ROOT / _PROVIDER_ADAPTERS[provider]
+    if active.is_file():
+        files.append(active)
     return sorted(files)
 
 
-def source_hash() -> str:
-    """A stable short hash over the package source and policies.
+def source_hash(provider: str = DEFAULT_PROVIDER) -> str:
+    """A stable short hash over the package source, policies, and the active provider's
+    adapter.
 
     Path-and-content based and order-independent (files are sorted), so it changes iff
     behaviour-affecting source changes, and is identical across machines with the same
-    tree. Returns `sha256:<12 hex>`.
+    tree. Provider-scoped: `source_hash("gemini")` and `source_hash("openrouter")` differ
+    only in which adapter is included, so the two model lines never collide and adding one
+    provider never invalidates the other's recorded calibration. Returns `sha256:<12 hex>`.
     """
     digest = hashlib.sha256()
-    for path in _relevant_files():
+    for path in _relevant_files(provider):
         rel = path.relative_to(_ROOT).as_posix()
         digest.update(rel.encode("utf-8"))
         digest.update(b"\0")

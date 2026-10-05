@@ -350,10 +350,12 @@ attack.
   excessive-calls attack costs a full day's quota by definition — racking up calls *is*
   the attack — so it is stub-verified in both variants rather than run live, and its
   calibration cell is reported empty with that reason rather than filled.
-- **Single model, single agent configuration.** All results are for `gemini-3.6-flash`
-  at system-prompt hash `5a2e75d84786a929`. A provider-neutral adapter seam
-  (`warden/demo_agent/`) exists to calibrate a second model; results under a different
-  model are keyed separately and never merged.
+- **Results are per model, by design.** The headline is a `gemini-3.6-flash` result at
+  system-prompt hash `5a2e75d84786a929`. A second model line (Grok via OpenRouter) is
+  wired behind `--provider` and keyed by a **provider-scoped source hash**, so the two
+  lines never merge and adding the second never moved the first's hash. A cross-model
+  result (does the data-channel-vs-prose line hold on both?) is stronger than one model,
+  but each model's ungoverned rate remains a property of *that* model at *that* time.
 
 ---
 
@@ -369,6 +371,15 @@ uv run python -m warden.cli redteam calibrate --status   # remaining runs, 0 req
 uv run python -m warden.cli redteam calibrate            # LIVE attack re-run (spends quota)
 uv run python -m warden.cli benign run                   # LIVE benign suite (spends quota)
 uv run python -m warden.cli report                        # regenerate docs/RESULTS.md
+```
+
+A second model line runs the same commands with `--provider openrouter` (set
+`OPENROUTER_API_KEY`; default model `x-ai/grok-4-fast`, override with `--model`). It is
+keyed by its own provider-scoped source hash, so Grok results never mix into Gemini's:
+
+```
+uv run python -m warden.cli redteam calibrate --provider openrouter   # paid, no daily cap
+uv run python -m warden.cli report --provider openrouter --out docs/RESULTS-grok.md
 ```
 
 **Results are pinned to two hashes**, both reported in every generated table:
