@@ -33,7 +33,7 @@ from openai import (
     RateLimitError,
 )
 
-DEFAULT_MODEL: Final = "x-ai/grok-4-fast"
+DEFAULT_MODEL: Final = "x-ai/grok-4.3"
 OPENROUTER_BASE_URL: Final = "https://openrouter.ai/api/v1"
 MAX_RETRIES: Final = 5
 BACKOFF_BASE_S: Final = 2.0
