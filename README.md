@@ -165,13 +165,27 @@ tainted cases block, the result is direct evidence that taint — not length —
 Established model-free before any quota was spent
 ([detail](docs/findings/stratification-confound.md)).
 
+**8. Benign results graded against a stale run from a reused directory.**
+The benign runner kept one directory per scenario and reused it across sessions, reading
+the graded run back with an unordered `SELECT run_id FROM runs`. When a scenario had run
+before, the database held more than one run and the query returned an arbitrary — usually
+the oldest — one, so the recorded false-positive verdict measured a *stale run under older
+code*. It surfaced only because a second model's benign numbers looked wrong: 8 of 15 Grok
+records had graded leftover pre-Grok runs, two from before ADR 0004 (when the destructive
+rule still denied rather than escalated). The verdicts looked entirely plausible — a benign
+run either blocks or it does not — which is what makes this the dangerous kind. Fixed by
+making each run self-contained (fresh db and state dir) and reading the latest run
+explicitly; the **attack** runner was never affected because it already uses a unique
+directory per run. Found by tracing one odd deviation to its call log, not by a failing
+test (`warden/redteam/benign_runner.py`).
+
 ### Findings that *destroyed measurability* (a different category)
 
 These did not skew a number in a known direction — they stopped a number from being
 trustworthy at all, which is the same category as each other and distinct from the biases
 above.
 
-**8. Retrying a per-day quota error.**
+**9. Retrying a per-day quota error.**
 This is distinct in kind from the biases above: it did not skew a number, it prevented
 one from existing while looking like normal operation. Google's 429 names the violated
 quota. A per-minute violation is worth sleeping through; a **per-day** one is not — the
@@ -186,7 +200,7 @@ The general shape is worth stating on its own: *a retry policy that cannot disti
 transient from exhausted will convert a recoverable pause into an unrecoverable one, and
 do it silently, because retrying is what a retry loop is supposed to do.*
 
-**9. Attack calibration rows were produced ad hoc, with no runner behind them, so the
+**10. Attack calibration rows were produced ad hoc, with no runner behind them, so the
 headline table was not reproducible.** Discovered by tracing call sites rather than by any
 failing test — `record_attempt` was defined but never called anywhere in the package, and
 the rows in the journal were indistinguishable from rows a runner would have written. This
@@ -202,7 +216,7 @@ under the frozen hash becomes a check on whether the ad-hoc numbers reproduce, a
 
 ### A data point excluded by hand, and why that is the honest move
 
-**10. One `priv-poisoned-deletion` attempt lost to a tooling error.**
+**11. One `priv-poisoned-deletion` attempt lost to a tooling error.**
 A shell loop driven through the WSL layer expanded a variable to empty, so two intended
 runs wrote to the same directory and a later `rm -rf` destroyed one run's call-log rows.
 The attempt was *observed* (it executed) but is *ungraded* (no rows survived to grade).
