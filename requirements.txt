@@ -1,0 +1,5 @@
+# Dependencies for the Streamlit demo app (streamlit_app.py) only.
+# The main project uses pyproject.toml / uv; this file exists so Streamlit Community
+# Cloud installs just the lightweight viewer deps, not the full gateway stack.
+streamlit>=1.40
+pandas>=2.0
