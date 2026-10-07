@@ -24,7 +24,9 @@ Two rates, never averaged: a hard block (DENY) is a correctness defect; an escal
 
 | stratum (steps) | hard-block rate | escalation rate | clean |
 |---|---|---|---|
-| _no benign runs under current code yet_ | — | — | — |
+| 2-3 | 0/0 | 0/0 | 0/0 |
+| 4-5 | 1/3 | 0/3 | 2/3 |
+| 6+ | 2/4 | 0/4 | 2/4 |
 
 **Stratification confound** (`docs/findings/stratification-confound.md`): after ADR 0004 (destructive escalates, not denies) the only hard-block is tainted exfiltration, and escalation is no longer pinned to the short stratum — a tainted destructive op escalates at any length. The residual structural fact is that an *untainted* boundary call must be the first tool call, so a long-untainted boundary call is impossible. Read as a pure length effect the table would be wrong.
 

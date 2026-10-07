@@ -11,6 +11,7 @@ One scenario per database, so a run's outcome is read back by run_id alone.
 from __future__ import annotations
 
 import os
+import shutil
 import sqlite3
 import sys
 from contextlib import AsyncExitStack
@@ -61,7 +62,18 @@ async def run_scenario(
     mode=BENCH so an escalation auto-denies without reaching for /dev/tty -- a benchmark
     does not wait for a human, and a REQUIRE_APPROVAL that auto-denies is exactly the
     ESCALATE outcome the FPR split measures.
+
+    Starts from a clean directory: the benign dirs are keyed by scenario and reused
+    across sessions, so a leftover db from a prior run (a different model, an older
+    policy) would otherwise linger. If it did, reading the run back would be ambiguous
+    and a stale run's state could bleed into this one. A fresh db and state dir make the
+    run self-contained and the run_id read unambiguous.
     """
+    for stale in (Path(db_path), Path(state_dir)):
+        if stale.is_dir():
+            shutil.rmtree(stale)
+        elif stale.exists():
+            stale.unlink()
     params = StdioServerParameters(
         env=_forwarded_env(),
         command=sys.executable,
@@ -86,7 +98,11 @@ async def run_scenario(
         await graph.ainvoke(initial)
 
     with sqlite3.connect(db_path) as conn:
-        row = conn.execute("SELECT run_id FROM runs").fetchone()
+        # Latest run, defensively: the db is fresh (above), but ordering makes the read
+        # correct even if a row somehow pre-exists, rather than returning an arbitrary one.
+        row = conn.execute(
+            "SELECT run_id FROM runs ORDER BY started_at_us DESC LIMIT 1"
+        ).fetchone()
     if row is None:
         raise RuntimeError(f"no run recorded for {scenario.scenario_id}")
     return str(row[0])
